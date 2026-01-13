@@ -1,0 +1,5038 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K-means 클러스터링: 식품 영양소 분석</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif;
+            background: linear-gradient(135deg, #a8e6cf 0%, #dcedc1 50%, #ffd3b6 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #ffffff 0%, #f0fff4 100%);
+            padding: 35px;
+            border-radius: 20px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+            margin-bottom: 30px;
+            border: 2px solid #c6f6d5;
+        }
+        
+        h1 {
+            background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-size: 2.2em;
+            margin-bottom: 12px;
+            font-weight: 800;
+        }
+        
+        .subtitle {
+            color: #2d3748;
+            font-size: 1.1em;
+            font-weight: 500;
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .dashboard {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .card {
+            background: linear-gradient(135deg, #ffffff 0%, #fefffe 100%);
+            padding: 28px;
+            border-radius: 20px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.12);
+            border: 1px solid rgba(56, 161, 105, 0.1);
+        }
+        
+        h2 {
+            background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 20px;
+            font-size: 1.6em;
+            border-bottom: 3px solid #68d391;
+            padding-bottom: 12px;
+            font-weight: 700;
+        }
+        
+        .search-box {
+            margin-bottom: 20px;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 14px 18px;
+            border: 2px solid #c6f6d5;
+            border-radius: 12px;
+            font-size: 1em;
+            transition: all 0.3s;
+            background: #f0fff4;
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: #48bb78;
+            box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.1);
+            background: white;
+        }
+        
+        .filter-section {
+            margin-bottom: 20px;
+        }
+        
+        .filter-title {
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: #2d3748;
+            font-size: 1.05em;
+        }
+        
+        .cluster-filter {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .filter-checkbox {
+            display: flex;
+            align-items: center;
+            padding: 10px 12px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: #f0fff4;
+            border: 2px solid transparent;
+        }
+        
+        .filter-checkbox:hover {
+            background: #c6f6d5;
+            border-color: #9ae6b4;
+            transform: translateX(4px);
+        }
+        
+        .filter-checkbox input {
+            margin-right: 12px;
+            cursor: pointer;
+            width: 18px;
+            height: 18px;
+        }
+        
+        .filter-checkbox label {
+            cursor: pointer;
+            flex: 1;
+            font-weight: 500;
+        }
+        
+        .search-results {
+            max-height: 400px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: #68d391 #f0fff4;
+        }
+        
+        .search-results::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .search-results::-webkit-scrollbar-track {
+            background: #f0fff4;
+            border-radius: 10px;
+        }
+        
+        .search-results::-webkit-scrollbar-thumb {
+            background: #68d391;
+            border-radius: 10px;
+        }
+        
+        .result-item {
+            padding: 14px;
+            border-bottom: 1px solid #e6fffa;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-radius: 8px;
+            margin-bottom: 6px;
+        }
+        
+        .result-item.selected {
+            background: linear-gradient(135deg, #ffd3b6 0%, #ffaaa5 100%);
+            border: 2px solid #ff1744;
+            transform: translateX(5px);
+            box-shadow: 0 6px 16px rgba(255, 23, 68, 0.3);
+        }
+        
+        .result-item:hover {
+            background: linear-gradient(135deg, #f0fff4 0%, #e6fffa 100%);
+            transform: translateX(5px);
+            box-shadow: 0 4px 12px rgba(56, 161, 105, 0.1);
+        }
+        
+        .result-item.selected:hover {
+            background: linear-gradient(135deg, #ffc3a6 0%, #ff9a95 100%);
+        }
+        
+        .result-item:last-child {
+            border-bottom: none;
+        }
+        
+        .result-name {
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 6px;
+            font-size: 1.05em;
+        }
+        
+        .result-category {
+            font-size: 0.92em;
+            color: #4a5568;
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+        
+        .result-stats {
+            font-size: 0.88em;
+            color: #718096;
+        }
+        
+        .cluster-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 700;
+            color: white;
+            margin-left: 6px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        }
+        
+        .cluster-badge-0 { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .cluster-badge-1 { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+        .cluster-badge-2 { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+        
+        .no-results {
+            padding: 30px;
+            text-align: center;
+            color: #718096;
+            font-weight: 500;
+        }
+        
+        #scatterPlot {
+            width: 100%;
+            height: 650px;
+            border-radius: 15px;
+            overflow: hidden;
+        }
+        
+        .cluster-info {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 18px;
+            margin-top: 20px;
+        }
+        
+        .cluster-card {
+            padding: 24px;
+            border-radius: 15px;
+            border: 3px solid;
+            transition: all 0.3s;
+            background: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.7) 100%);
+        }
+        
+        .cluster-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+        }
+        
+        .cluster-0 { 
+            border-color: #667eea; 
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%);
+        }
+        .cluster-1 { 
+            border-color: #f5576c; 
+            background: linear-gradient(135deg, rgba(240, 147, 251, 0.08) 0%, rgba(245, 87, 108, 0.08) 100%);
+        }
+        .cluster-2 { 
+            border-color: #00f2fe; 
+            background: linear-gradient(135deg, rgba(79, 172, 254, 0.08) 0%, rgba(0, 242, 254, 0.08) 100%);
+        }
+        
+        .cluster-title {
+            font-size: 1.4em;
+            font-weight: 800;
+            margin-bottom: 18px;
+        }
+        
+        .stat {
+            margin: 12px 0;
+            padding: 12px;
+            background: rgba(255,255,255,0.9);
+            border-radius: 10px;
+            border-left: 4px solid #68d391;
+        }
+        
+        .stat-label {
+            font-size: 0.92em;
+            color: #4a5568;
+            font-weight: 600;
+        }
+        
+        .stat-value {
+            font-size: 1.3em;
+            font-weight: 800;
+            color: #2d3748;
+            margin-top: 4px;
+        }
+        
+        .category-list {
+            margin-top: 18px;
+        }
+        
+        .category-item {
+            padding: 10px 12px;
+            margin: 6px 0;
+            background: rgba(255,255,255,0.95);
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid rgba(56, 161, 105, 0.1);
+            font-weight: 500;
+        }
+        
+        .badge {
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 0.88em;
+            font-weight: 700;
+            box-shadow: 0 2px 6px rgba(56, 161, 105, 0.3);
+        }
+        
+        .info-box {
+            background: linear-gradient(135deg, #f0fff4 0%, #e6fffa 100%);
+            padding: 20px 24px;
+            border-radius: 15px;
+            margin: 20px 0;
+            border-left: 5px solid #48bb78;
+            box-shadow: 0 8px 20px rgba(56, 161, 105, 0.1);
+            line-height: 1.8;
+            font-weight: 500;
+            color: #2d3748;
+        }
+        
+        .info-box strong {
+            color: #2f855a;
+            font-weight: 700;
+        }
+        
+        .result-count {
+            font-size: 0.95em;
+            color: #4a5568;
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+        
+        @media (max-width: 1200px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .cluster-info {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        @media (min-width: 1200px) {
+            .cluster-info {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔬 K-means 클러스터링: 식품 영양소 분석</h1>
+            <p class="subtitle">에너지(kcal)와 나트륨(mg)을 기준으로 한 정규화 클러스터링 결과</p>
+        </header>
+        
+        <div class="info-box">
+            <strong>📊 분석 방법:</strong> StandardScaler를 사용한 정규화 후 K-means (k=3) 클러스터링 적용<br>
+            <strong>🚫 제외 항목:</strong> 김치류, 장아찌·절임류, 장류/양념류<br>
+            <strong>📈 실루엣 스코어:</strong> 0.4181 (클러스터링 품질 지표: -1 ~ 1, 높을수록 좋음)
+        </div>
+        
+        <div class="main-content">
+            <!-- 왼쪽 사이드바 (검색) -->
+            <div class="sidebar">
+                <div class="card">
+                    <h2>🔍 식품 검색</h2>
+                    
+                    <div class="search-box">
+                        <input 
+                            type="text" 
+                            id="searchInput" 
+                            class="search-input" 
+                            placeholder="식품명 검색..."
+                        >
+                    </div>
+                    
+                    <div class="filter-section">
+                        <div class="filter-title">클러스터 필터</div>
+                        <div class="cluster-filter">
+                            <div class="filter-checkbox">
+                                <input type="checkbox" id="cluster0" value="0" checked>
+                                <label for="cluster0">
+                                    Cluster 0 <span class="cluster-badge cluster-badge-0">저칼로리·중나트륨</span>
+                                </label>
+                            </div>
+                            <div class="filter-checkbox">
+                                <input type="checkbox" id="cluster1" value="1" checked>
+                                <label for="cluster1">
+                                    Cluster 1 <span class="cluster-badge cluster-badge-1">고칼로리·고나트륨</span>
+                                </label>
+                            </div>
+                            <div class="filter-checkbox">
+                                <input type="checkbox" id="cluster2" value="2" checked>
+                                <label for="cluster2">
+                                    Cluster 2 <span class="cluster-badge cluster-badge-2">중칼로리·저나트륨</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="result-count" id="resultCount"></div>
+                    
+                    <div class="search-results" id="searchResults"></div>
+                </div>
+            </div>
+            
+            <!-- 오른쪽 메인 컨텐츠 -->
+            <div class="dashboard">
+                <div class="card">
+                    <h2>📈 클러스터 산점도</h2>
+                    <div id="scatterPlot"></div>
+                </div>
+                
+                <div class="card">
+                    <h2>📋 클러스터별 특성</h2>
+                    <div class="cluster-info" id="clusterInfo"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // 클러스터 데이터
+        const clusterData = {
+  "data": [
+    {
+      "식품명": "흰죽",
+      "에너지(kcal)": 64,
+      "나트륨(mg)": 130,
+      "cluster": 0,
+      "식품대분류명": "죽 및 스프류"
+    },
+    {
+      "식품명": "흑미밥_찹쌀",
+      "에너지(kcal)": 121,
+      "나트륨(mg)": 2,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "흑미밥",
+      "에너지(kcal)": 118,
+      "나트륨(mg)": 3,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "홍합국(홍합탕)",
+      "에너지(kcal)": 17,
+      "나트륨(mg)": 137,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "홍합 미역국",
+      "에너지(kcal)": 17,
+      "나트륨(mg)": 238,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "홍합 무국",
+      "에너지(kcal)": 19,
+      "나트륨(mg)": 85,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "혼합잡곡밥",
+      "에너지(kcal)": 118,
+      "나트륨(mg)": 18,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "호박죽",
+      "에너지(kcal)": 38,
+      "나트륨(mg)": 29,
+      "cluster": 0,
+      "식품대분류명": "죽 및 스프류"
+    },
+    {
+      "식품명": "호박전",
+      "에너지(kcal)": 126,
+      "나트륨(mg)": 155,
+      "cluster": 2,
+      "식품대분류명": "전·적 및 부침류"
+    },
+    {
+      "식품명": "호박나물",
+      "에너지(kcal)": 38,
+      "나트륨(mg)": 213,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "호박 된장국",
+      "에너지(kcal)": 17,
+      "나트륨(mg)": 212,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "호떡",
+      "에너지(kcal)": 147,
+      "나트륨(mg)": 2,
+      "cluster": 2,
+      "식품대분류명": "빵 및 과자류"
+    },
+    {
+      "식품명": "현미밥_쌀",
+      "에너지(kcal)": 118,
+      "나트륨(mg)": 3,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "현미밥",
+      "에너지(kcal)": 118,
+      "나트륨(mg)": 1,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "햄채소볶음",
+      "에너지(kcal)": 296,
+      "나트륨(mg)": 594,
+      "cluster": 1,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "햄전",
+      "에너지(kcal)": 241,
+      "나트륨(mg)": 731,
+      "cluster": 1,
+      "식품대분류명": "전·적 및 부침류"
+    },
+    {
+      "식품명": "햄샐러드",
+      "에너지(kcal)": 107,
+      "나트륨(mg)": 190,
+      "cluster": 2,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "햄샌드위치_치즈",
+      "에너지(kcal)": 252,
+      "나트륨(mg)": 446,
+      "cluster": 1,
+      "식품대분류명": "빵 및 과자류"
+    },
+    {
+      "식품명": "햄부침",
+      "에너지(kcal)": 237,
+      "나트륨(mg)": 733,
+      "cluster": 1,
+      "식품대분류명": "전·적 및 부침류"
+    },
+    {
+      "식품명": "햄버거_치킨",
+      "에너지(kcal)": 123,
+      "나트륨(mg)": 265,
+      "cluster": 2,
+      "식품대분류명": "빵 및 과자류"
+    },
+    {
+      "식품명": "햄버거",
+      "에너지(kcal)": 229,
+      "나트륨(mg)": 410,
+      "cluster": 2,
+      "식품대분류명": "빵 및 과자류"
+    },
+    {
+      "식품명": "햄구이",
+      "에너지(kcal)": 260,
+      "나트륨(mg)": 695,
+      "cluster": 1,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "해물파전",
+      "에너지(kcal)": 128,
+      "나트륨(mg)": 84,
+      "cluster": 2,
+      "식품대분류명": "전·적 및 부침류"
+    },
+    {
+      "식품명": "해물 완자전",
+      "에너지(kcal)": 236,
+      "나트륨(mg)": 175,
+      "cluster": 2,
+      "식품대분류명": "전·적 및 부침류"
+    },
+    {
+      "식품명": "해물 된장국",
+      "에너지(kcal)": 36,
+      "나트륨(mg)": 269,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "핫케이크",
+      "에너지(kcal)": 193,
+      "나트륨(mg)": 339,
+      "cluster": 2,
+      "식품대분류명": "빵 및 과자류"
+    },
+    {
+      "식품명": "함박스테이크",
+      "에너지(kcal)": 250,
+      "나트륨(mg)": 645,
+      "cluster": 1,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "하이라이스",
+      "에너지(kcal)": 120,
+      "나트륨(mg)": 71,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "피자",
+      "에너지(kcal)": 219,
+      "나트륨(mg)": 212,
+      "cluster": 2,
+      "식품대분류명": "빵 및 과자류"
+    },
+    {
+      "식품명": "표고버섯볶음",
+      "에너지(kcal)": 34,
+      "나트륨(mg)": 144,
+      "cluster": 0,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "폭찹",
+      "에너지(kcal)": 124,
+      "나트륨(mg)": 164,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "팥죽",
+      "에너지(kcal)": 121,
+      "나트륨(mg)": 157,
+      "cluster": 2,
+      "식품대분류명": "죽 및 스프류"
+    },
+    {
+      "식품명": "팥밥",
+      "에너지(kcal)": 119,
+      "나트륨(mg)": 2,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "파무침",
+      "에너지(kcal)": 38,
+      "나트륨(mg)": 82,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "파래볶음",
+      "에너지(kcal)": 61,
+      "나트륨(mg)": 60,
+      "cluster": 0,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "파래무침_무",
+      "에너지(kcal)": 38,
+      "나트륨(mg)": 283,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "트위스터 샌드위치",
+      "에너지(kcal)": 56,
+      "나트륨(mg)": 131,
+      "cluster": 0,
+      "식품대분류명": "빵 및 과자류"
+    },
+    {
+      "식품명": "탕평채",
+      "에너지(kcal)": 65,
+      "나트륨(mg)": 190,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "탕수육",
+      "에너지(kcal)": 160,
+      "나트륨(mg)": 110,
+      "cluster": 2,
+      "식품대분류명": "튀김류"
+    },
+    {
+      "식품명": "탕수어",
+      "에너지(kcal)": 185,
+      "나트륨(mg)": 213,
+      "cluster": 2,
+      "식품대분류명": "튀김류"
+    },
+    {
+      "식품명": "콩조림",
+      "에너지(kcal)": 198,
+      "나트륨(mg)": 620,
+      "cluster": 1,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "콩나물잡채",
+      "에너지(kcal)": 43,
+      "나트륨(mg)": 120,
+      "cluster": 0,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "콩나물밥_양념장",
+      "에너지(kcal)": 112,
+      "나트륨(mg)": 130,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "콩나물밥_소고기",
+      "에너지(kcal)": 160,
+      "나트륨(mg)": 161,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "콩나물무침_콩나물_고춧가루제외",
+      "에너지(kcal)": 19,
+      "나트륨(mg)": 136,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "콩나물무침_콩나물_고춧가루",
+      "에너지(kcal)": 19,
+      "나트륨(mg)": 149,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "콩나물무침_시금치",
+      "에너지(kcal)": 21,
+      "나트륨(mg)": 134,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "콩나물무침_소금",
+      "에너지(kcal)": 20,
+      "나트륨(mg)": 174,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "콩나물무침_부추",
+      "에너지(kcal)": 23,
+      "나트륨(mg)": 168,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "콩나물무침_당근_시금치",
+      "에너지(kcal)": 23,
+      "나트륨(mg)": 122,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "콩나물무침_당근",
+      "에너지(kcal)": 27,
+      "나트륨(mg)": 116,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "콩나물무침_고춧가루",
+      "에너지(kcal)": 19,
+      "나트륨(mg)": 152,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "콩나물무침",
+      "에너지(kcal)": 19,
+      "나트륨(mg)": 138,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "콩나물냉채_오이",
+      "에너지(kcal)": 59,
+      "나트륨(mg)": 167,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "콩나물국_콩나물만",
+      "에너지(kcal)": 7,
+      "나트륨(mg)": 151,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "콩나물국_콩나물_소고기",
+      "에너지(kcal)": 31,
+      "나트륨(mg)": 151,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "콩나물국_청양고추",
+      "에너지(kcal)": 8,
+      "나트륨(mg)": 179,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "콩나물국_무",
+      "에너지(kcal)": 6,
+      "나트륨(mg)": 122,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "콩나물국_고춧가루",
+      "에너지(kcal)": 7,
+      "나트륨(mg)": 161,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "콩나물 황태국",
+      "에너지(kcal)": 30,
+      "나트륨(mg)": 129,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "콩나물 선짓국_낙지",
+      "에너지(kcal)": 21,
+      "나트륨(mg)": 146,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "콩나물 느타리무침",
+      "에너지(kcal)": 45,
+      "나트륨(mg)": 175,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "콘치즈구이",
+      "에너지(kcal)": 105,
+      "나트륨(mg)": 151,
+      "cluster": 2,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "코다리찜",
+      "에너지(kcal)": 46,
+      "나트륨(mg)": 149,
+      "cluster": 0,
+      "식품대분류명": "찜류"
+    },
+    {
+      "식품명": "코다리조림_무",
+      "에너지(kcal)": 73,
+      "나트륨(mg)": 319,
+      "cluster": 0,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "칼국수_해물",
+      "에너지(kcal)": 78,
+      "나트륨(mg)": 267,
+      "cluster": 0,
+      "식품대분류명": "면 및 만두류"
+    },
+    {
+      "식품명": "칼국수",
+      "에너지(kcal)": 97,
+      "나트륨(mg)": 184,
+      "cluster": 2,
+      "식품대분류명": "면 및 만두류"
+    },
+    {
+      "식품명": "카레라이스_돼지고기_모듬채소",
+      "에너지(kcal)": 99,
+      "나트륨(mg)": 25,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "카레라이스_돼지고기",
+      "에너지(kcal)": 167,
+      "나트륨(mg)": 8,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "치킨데리야끼",
+      "에너지(kcal)": 142,
+      "나트륨(mg)": 341,
+      "cluster": 2,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "치커리 겉절이",
+      "에너지(kcal)": 58,
+      "나트륨(mg)": 506,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "치즈 스파게티_해물",
+      "에너지(kcal)": 99,
+      "나트륨(mg)": 133,
+      "cluster": 2,
+      "식품대분류명": "면 및 만두류"
+    },
+    {
+      "식품명": "취나물무침_소금",
+      "에너지(kcal)": 99,
+      "나트륨(mg)": 767,
+      "cluster": 1,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "취나물무침_간장",
+      "에너지(kcal)": 25,
+      "나트륨(mg)": 140,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "취나물무침",
+      "에너지(kcal)": 44,
+      "나트륨(mg)": 368,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "취나물_된장",
+      "에너지(kcal)": 59,
+      "나트륨(mg)": 194,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "추어탕",
+      "에너지(kcal)": 26,
+      "나트륨(mg)": 238,
+      "cluster": 0,
+      "식품대분류명": "찌개 및 전골류"
+    },
+    {
+      "식품명": "청포묵무침",
+      "에너지(kcal)": 53,
+      "나트륨(mg)": 271,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "청포묵 무침",
+      "에너지(kcal)": 53,
+      "나트륨(mg)": 275,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "청국장찌개_배추김치",
+      "에너지(kcal)": 29,
+      "나트륨(mg)": 193,
+      "cluster": 0,
+      "식품대분류명": "찌개 및 전골류"
+    },
+    {
+      "식품명": "천사채무침",
+      "에너지(kcal)": 73,
+      "나트륨(mg)": 248,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "채소튀김",
+      "에너지(kcal)": 214,
+      "나트륨(mg)": 798,
+      "cluster": 1,
+      "식품대분류명": "튀김류"
+    },
+    {
+      "식품명": "채소전",
+      "에너지(kcal)": 204,
+      "나트륨(mg)": 247,
+      "cluster": 2,
+      "식품대분류명": "전·적 및 부침류"
+    },
+    {
+      "식품명": "채소밥",
+      "에너지(kcal)": 114,
+      "나트륨(mg)": 134,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "참치찌개",
+      "에너지(kcal)": 45,
+      "나트륨(mg)": 332,
+      "cluster": 0,
+      "식품대분류명": "찌개 및 전골류"
+    },
+    {
+      "식품명": "참치죽",
+      "에너지(kcal)": 60,
+      "나트륨(mg)": 122,
+      "cluster": 0,
+      "식품대분류명": "죽 및 스프류"
+    },
+    {
+      "식품명": "참치 샐러드",
+      "에너지(kcal)": 250,
+      "나트륨(mg)": 189,
+      "cluster": 2,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "참나물 겉절이_단감",
+      "에너지(kcal)": 22,
+      "나트륨(mg)": 95,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "참나물 겉절이",
+      "에너지(kcal)": 17,
+      "나트륨(mg)": 98,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "참나물",
+      "에너지(kcal)": 17,
+      "나트륨(mg)": 173,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "찰밥",
+      "에너지(kcal)": 120,
+      "나트륨(mg)": 1,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "차조밥",
+      "에너지(kcal)": 119,
+      "나트륨(mg)": 2,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "쫄면",
+      "에너지(kcal)": 113,
+      "나트륨(mg)": 559,
+      "cluster": 2,
+      "식품대분류명": "면 및 만두류"
+    },
+    {
+      "식품명": "짬뽕",
+      "에너지(kcal)": 73,
+      "나트륨(mg)": 125,
+      "cluster": 0,
+      "식품대분류명": "면 및 만두류"
+    },
+    {
+      "식품명": "짜장밥",
+      "에너지(kcal)": 140,
+      "나트륨(mg)": 274,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "짜장면",
+      "에너지(kcal)": 105,
+      "나트륨(mg)": 295,
+      "cluster": 2,
+      "식품대분류명": "면 및 만두류"
+    },
+    {
+      "식품명": "쥐포조림",
+      "에너지(kcal)": 140,
+      "나트륨(mg)": 461,
+      "cluster": 2,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "쥐포무침",
+      "에너지(kcal)": 339,
+      "나트륨(mg)": 1542,
+      "cluster": 1,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "주먹밥",
+      "에너지(kcal)": 135,
+      "나트륨(mg)": 105,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "주꾸미볶음",
+      "에너지(kcal)": 74,
+      "나트륨(mg)": 246,
+      "cluster": 0,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "조기구이",
+      "에너지(kcal)": 205,
+      "나트륨(mg)": 737,
+      "cluster": 1,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "조개 미역국",
+      "에너지(kcal)": 11,
+      "나트륨(mg)": 241,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "제육볶음_채소",
+      "에너지(kcal)": 109,
+      "나트륨(mg)": 231,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "제육볶음_오징어",
+      "에너지(kcal)": 96,
+      "나트륨(mg)": 207,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "제육볶음",
+      "에너지(kcal)": 168,
+      "나트륨(mg)": 333,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "제육(돼지고기 수육)",
+      "에너지(kcal)": 150,
+      "나트륨(mg)": 319,
+      "cluster": 2,
+      "식품대분류명": "찜류"
+    },
+    {
+      "식품명": "장조림_돼지고기_메추리알",
+      "에너지(kcal)": 141,
+      "나트륨(mg)": 295,
+      "cluster": 2,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "장어튀김",
+      "에너지(kcal)": 209,
+      "나트륨(mg)": 899,
+      "cluster": 1,
+      "식품대분류명": "튀김류"
+    },
+    {
+      "식품명": "장어 양념구이",
+      "에너지(kcal)": 331,
+      "나트륨(mg)": 774,
+      "cluster": 1,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "장어 덮밥",
+      "에너지(kcal)": 95,
+      "나트륨(mg)": 80,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "장국국수",
+      "에너지(kcal)": 144,
+      "나트륨(mg)": 581,
+      "cluster": 1,
+      "식품대분류명": "면 및 만두류"
+    },
+    {
+      "식품명": "잡채밥",
+      "에너지(kcal)": 102,
+      "나트륨(mg)": 86,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "잡채_소고기",
+      "에너지(kcal)": 112,
+      "나트륨(mg)": 235,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "잡채_버섯_소고기",
+      "에너지(kcal)": 129,
+      "나트륨(mg)": 287,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "잡채_돼지고기",
+      "에너지(kcal)": 109,
+      "나트륨(mg)": 261,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "잡곡밥_현미",
+      "에너지(kcal)": 133,
+      "나트륨(mg)": 2,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "잡곡밥_보리_흑미",
+      "에너지(kcal)": 135,
+      "나트륨(mg)": 1,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "잡곡밥_보리",
+      "에너지(kcal)": 137,
+      "나트륨(mg)": 1,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "잔치국수",
+      "에너지(kcal)": 66,
+      "나트륨(mg)": 290,
+      "cluster": 0,
+      "식품대분류명": "면 및 만두류"
+    },
+    {
+      "식품명": "잔멸치볶음_풋고추",
+      "에너지(kcal)": 93,
+      "나트륨(mg)": 697,
+      "cluster": 1,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "잔멸치볶음_잔멸치_견과류",
+      "에너지(kcal)": 147,
+      "나트륨(mg)": 521,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "잔멸치볶음_고추장",
+      "에너지(kcal)": 231,
+      "나트륨(mg)": 1213,
+      "cluster": 1,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "잔멸치볶음_견과류",
+      "에너지(kcal)": 147,
+      "나트륨(mg)": 521,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "잔멸치볶음_간장_고추장",
+      "에너지(kcal)": 109,
+      "나트륨(mg)": 788,
+      "cluster": 1,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "잔멸치볶음",
+      "에너지(kcal)": 130,
+      "나트륨(mg)": 630,
+      "cluster": 1,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "자장면",
+      "에너지(kcal)": 114,
+      "나트륨(mg)": 298,
+      "cluster": 2,
+      "식품대분류명": "면 및 만두류"
+    },
+    {
+      "식품명": "임연수튀김",
+      "에너지(kcal)": 180,
+      "나트륨(mg)": 593,
+      "cluster": 1,
+      "식품대분류명": "튀김류"
+    },
+    {
+      "식품명": "임연수구이",
+      "에너지(kcal)": 256,
+      "나트륨(mg)": 972,
+      "cluster": 1,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "율무밥",
+      "에너지(kcal)": 118,
+      "나트륨(mg)": 2,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "육개장_소고기",
+      "에너지(kcal)": 33,
+      "나트륨(mg)": 158,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "육개장_돼지고기",
+      "에너지(kcal)": 45,
+      "나트륨(mg)": 161,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "육개장_닭고기",
+      "에너지(kcal)": 44,
+      "나트륨(mg)": 171,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "유채무침",
+      "에너지(kcal)": 60,
+      "나트륨(mg)": 227,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "유채나물",
+      "에너지(kcal)": 50,
+      "나트륨(mg)": 472,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "유부국",
+      "에너지(kcal)": 17,
+      "나트륨(mg)": 162,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "우엉조림",
+      "에너지(kcal)": 120,
+      "나트륨(mg)": 314,
+      "cluster": 2,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "우엉볶음",
+      "에너지(kcal)": 65,
+      "나트륨(mg)": 185,
+      "cluster": 0,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "우럭구이",
+      "에너지(kcal)": 207,
+      "나트륨(mg)": 1247,
+      "cluster": 1,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "우동",
+      "에너지(kcal)": 61,
+      "나트륨(mg)": 169,
+      "cluster": 0,
+      "식품대분류명": "면 및 만두류"
+    },
+    {
+      "식품명": "완자조림",
+      "에너지(kcal)": 171,
+      "나트륨(mg)": 224,
+      "cluster": 2,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "완자전",
+      "에너지(kcal)": 313,
+      "나트륨(mg)": 167,
+      "cluster": 2,
+      "식품대분류명": "전·적 및 부침류"
+    },
+    {
+      "식품명": "완두콩밥",
+      "에너지(kcal)": 114,
+      "나트륨(mg)": 3,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "올갱이해장국",
+      "에너지(kcal)": 41,
+      "나트륨(mg)": 343,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "옥수수샐러드",
+      "에너지(kcal)": 130,
+      "나트륨(mg)": 351,
+      "cluster": 2,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "옥수수밥",
+      "에너지(kcal)": 113,
+      "나트륨(mg)": 4,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "오징어포조림",
+      "에너지(kcal)": 133,
+      "나트륨(mg)": 449,
+      "cluster": 2,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "오징어튀김",
+      "에너지(kcal)": 163,
+      "나트륨(mg)": 200,
+      "cluster": 2,
+      "식품대분류명": "튀김류"
+    },
+    {
+      "식품명": "오징어탕수",
+      "에너지(kcal)": 158,
+      "나트륨(mg)": 248,
+      "cluster": 2,
+      "식품대분류명": "튀김류"
+    },
+    {
+      "식품명": "오징어채볶음",
+      "에너지(kcal)": 54,
+      "나트륨(mg)": 164,
+      "cluster": 0,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "오징어채무침",
+      "에너지(kcal)": 355,
+      "나트륨(mg)": 1012,
+      "cluster": 1,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "오징어볶음_채소",
+      "에너지(kcal)": 77,
+      "나트륨(mg)": 264,
+      "cluster": 0,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "오징어볶음",
+      "에너지(kcal)": 77,
+      "나트륨(mg)": 264,
+      "cluster": 0,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "오징어무침_채소",
+      "에너지(kcal)": 48,
+      "나트륨(mg)": 183,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "오징어무침_미나리",
+      "에너지(kcal)": 107,
+      "나트륨(mg)": 362,
+      "cluster": 2,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "오징어무침",
+      "에너지(kcal)": 82,
+      "나트륨(mg)": 190,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "오징어국",
+      "에너지(kcal)": 24,
+      "나트륨(mg)": 160,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "오이지무침",
+      "에너지(kcal)": 45,
+      "나트륨(mg)": 1083,
+      "cluster": 1,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "오이생채_오이_부추",
+      "에너지(kcal)": 48,
+      "나트륨(mg)": 362,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "오이생채_오이_달래",
+      "에너지(kcal)": 28,
+      "나트륨(mg)": 255,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "오이생채_오이",
+      "에너지(kcal)": 32,
+      "나트륨(mg)": 232,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "오이생채_부추",
+      "에너지(kcal)": 48,
+      "나트륨(mg)": 374,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "오이무침_양파",
+      "에너지(kcal)": 33,
+      "나트륨(mg)": 232,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "오이무침_달래",
+      "에너지(kcal)": 28,
+      "나트륨(mg)": 251,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "오이모듬무침",
+      "에너지(kcal)": 34,
+      "나트륨(mg)": 305,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "오이냉국_미역",
+      "에너지(kcal)": 7,
+      "나트륨(mg)": 338,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "오이고추 된장무침",
+      "에너지(kcal)": 32,
+      "나트륨(mg)": 313,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "오이 도라지 생채",
+      "에너지(kcal)": 42,
+      "나트륨(mg)": 285,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "오믈렛",
+      "에너지(kcal)": 88,
+      "나트륨(mg)": 183,
+      "cluster": 0,
+      "식품대분류명": "전·적 및 부침류"
+    },
+    {
+      "식품명": "오므라이스",
+      "에너지(kcal)": 106,
+      "나트륨(mg)": 138,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "오리탕",
+      "에너지(kcal)": 79,
+      "나트륨(mg)": 212,
+      "cluster": 0,
+      "식품대분류명": "찌개 및 전골류"
+    },
+    {
+      "식품명": "오리불고기",
+      "에너지(kcal)": 81,
+      "나트륨(mg)": 196,
+      "cluster": 0,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "오리고기로스",
+      "에너지(kcal)": 169,
+      "나트륨(mg)": 510,
+      "cluster": 2,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "영양돌솥밥",
+      "에너지(kcal)": 114,
+      "나트륨(mg)": 26,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "열무나물_된장",
+      "에너지(kcal)": 50,
+      "나트륨(mg)": 464,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "열무나물_간장",
+      "에너지(kcal)": 34,
+      "나트륨(mg)": 728,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "열무 된장국",
+      "에너지(kcal)": 20,
+      "나트륨(mg)": 338,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "연어구이",
+      "에너지(kcal)": 223,
+      "나트륨(mg)": 1370,
+      "cluster": 1,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "연두부찜",
+      "에너지(kcal)": 76,
+      "나트륨(mg)": 155,
+      "cluster": 0,
+      "식품대분류명": "찜류"
+    },
+    {
+      "식품명": "연근조림",
+      "에너지(kcal)": 185,
+      "나트륨(mg)": 528,
+      "cluster": 1,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "얼갈이겉절이",
+      "에너지(kcal)": 27,
+      "나트륨(mg)": 340,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "얼갈이 된장국",
+      "에너지(kcal)": 14,
+      "나트륨(mg)": 216,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "어묵튀김",
+      "에너지(kcal)": 179,
+      "나트륨(mg)": 825,
+      "cluster": 1,
+      "식품대분류명": "튀김류"
+    },
+    {
+      "식품명": "어묵탕_고춧가루",
+      "에너지(kcal)": 29,
+      "나트륨(mg)": 252,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "어묵탕",
+      "에너지(kcal)": 30,
+      "나트륨(mg)": 255,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "어묵조림",
+      "에너지(kcal)": 166,
+      "나트륨(mg)": 741,
+      "cluster": 1,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "어묵잡채",
+      "에너지(kcal)": 128,
+      "나트륨(mg)": 432,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "어묵볶음_채소",
+      "에너지(kcal)": 79,
+      "나트륨(mg)": 343,
+      "cluster": 0,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "어묵볶음_어묵_채소",
+      "에너지(kcal)": 78,
+      "나트륨(mg)": 343,
+      "cluster": 0,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "어묵볶음",
+      "에너지(kcal)": 110,
+      "나트륨(mg)": 454,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "어묵국(어묵탕)_고춧가루",
+      "에너지(kcal)": 30,
+      "나트륨(mg)": 252,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "어묵국",
+      "에너지(kcal)": 43,
+      "나트륨(mg)": 520,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "어묵 우동",
+      "에너지(kcal)": 61,
+      "나트륨(mg)": 173,
+      "cluster": 0,
+      "식품대분류명": "면 및 만두류"
+    },
+    {
+      "식품명": "어묵 오이무침",
+      "에너지(kcal)": 127,
+      "나트륨(mg)": 531,
+      "cluster": 2,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "어묵 매운탕",
+      "에너지(kcal)": 40,
+      "나트륨(mg)": 235,
+      "cluster": 0,
+      "식품대분류명": "찌개 및 전골류"
+    },
+    {
+      "식품명": "양송이버섯볶음_소고기",
+      "에너지(kcal)": 84,
+      "나트륨(mg)": 295,
+      "cluster": 0,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "양상추 샐러드",
+      "에너지(kcal)": 79,
+      "나트륨(mg)": 136,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "양배추오이  샐러드",
+      "에너지(kcal)": 188,
+      "나트륨(mg)": 120,
+      "cluster": 2,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "양배추부추무침",
+      "에너지(kcal)": 41,
+      "나트륨(mg)": 374,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "양배추나물",
+      "에너지(kcal)": 71,
+      "나트륨(mg)": 799,
+      "cluster": 1,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "양배추 사과 샐러드",
+      "에너지(kcal)": 136,
+      "나트륨(mg)": 73,
+      "cluster": 2,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "양배추 겉절이",
+      "에너지(kcal)": 46,
+      "나트륨(mg)": 434,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "애호박전",
+      "에너지(kcal)": 126,
+      "나트륨(mg)": 155,
+      "cluster": 2,
+      "식품대분류명": "전·적 및 부침류"
+    },
+    {
+      "식품명": "애호박부침개",
+      "에너지(kcal)": 159,
+      "나트륨(mg)": 429,
+      "cluster": 2,
+      "식품대분류명": "전·적 및 부침류"
+    },
+    {
+      "식품명": "애호박 감자된장국_바지락",
+      "에너지(kcal)": 23,
+      "나트륨(mg)": 185,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "알밥",
+      "에너지(kcal)": 86,
+      "나트륨(mg)": 151,
+      "cluster": 0,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "아욱 된장국",
+      "에너지(kcal)": 16,
+      "나트륨(mg)": 252,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "쑥갓나물_두부",
+      "에너지(kcal)": 33,
+      "나트륨(mg)": 196,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "쑥갓나물_고춧가루",
+      "에너지(kcal)": 45,
+      "나트륨(mg)": 520,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "쑥갓나물",
+      "에너지(kcal)": 19,
+      "나트륨(mg)": 275,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "쑥 된장국",
+      "에너지(kcal)": 25,
+      "나트륨(mg)": 245,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "쌀밥",
+      "에너지(kcal)": 120,
+      "나트륨(mg)": 1,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "쌀국수",
+      "에너지(kcal)": 66,
+      "나트륨(mg)": 474,
+      "cluster": 0,
+      "식품대분류명": "면 및 만두류"
+    },
+    {
+      "식품명": "식빵튀김",
+      "에너지(kcal)": 262,
+      "나트륨(mg)": 342,
+      "cluster": 2,
+      "식품대분류명": "튀김류"
+    },
+    {
+      "식품명": "시래기나물",
+      "에너지(kcal)": 58,
+      "나트륨(mg)": 1041,
+      "cluster": 1,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "시래기 된장국",
+      "에너지(kcal)": 17,
+      "나트륨(mg)": 274,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "시금치나물_간장_소금",
+      "에너지(kcal)": 27,
+      "나트륨(mg)": 264,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "시금치나물_간장",
+      "에너지(kcal)": 35,
+      "나트륨(mg)": 448,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "시금치나물",
+      "에너지(kcal)": 27,
+      "나트륨(mg)": 274,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "시금치 된장국",
+      "에너지(kcal)": 15,
+      "나트륨(mg)": 262,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "스파게티",
+      "에너지(kcal)": 163,
+      "나트륨(mg)": 171,
+      "cluster": 2,
+      "식품대분류명": "면 및 만두류"
+    },
+    {
+      "식품명": "스크램블드에그",
+      "에너지(kcal)": 88,
+      "나트륨(mg)": 182,
+      "cluster": 0,
+      "식품대분류명": "전·적 및 부침류"
+    },
+    {
+      "식품명": "순대볶음_채소",
+      "에너지(kcal)": 99,
+      "나트륨(mg)": 334,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "순대볶음",
+      "에너지(kcal)": 100,
+      "나트륨(mg)": 270,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "순대국",
+      "에너지(kcal)": 25,
+      "나트륨(mg)": 128,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "순대",
+      "에너지(kcal)": 165,
+      "나트륨(mg)": 271,
+      "cluster": 2,
+      "식품대분류명": "찜류"
+    },
+    {
+      "식품명": "숙주미나리나물",
+      "에너지(kcal)": 18,
+      "나트륨(mg)": 178,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "숙주나물_숙주_게맛살",
+      "에너지(kcal)": 28,
+      "나트륨(mg)": 280,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "숙주나물_숙주",
+      "에너지(kcal)": 17,
+      "나트륨(mg)": 168,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "숙주나물_미나리",
+      "에너지(kcal)": 18,
+      "나트륨(mg)": 181,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "숙주나물",
+      "에너지(kcal)": 23,
+      "나트륨(mg)": 544,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "수제비_감자",
+      "에너지(kcal)": 88,
+      "나트륨(mg)": 96,
+      "cluster": 0,
+      "식품대분류명": "면 및 만두류"
+    },
+    {
+      "식품명": "수수밥",
+      "에너지(kcal)": 118,
+      "나트륨(mg)": 2,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "수박화채",
+      "에너지(kcal)": 42,
+      "나트륨(mg)": 9,
+      "cluster": 0,
+      "식품대분류명": "음료 및 차류"
+    },
+    {
+      "식품명": "소시지튀김",
+      "에너지(kcal)": 280,
+      "나트륨(mg)": 880,
+      "cluster": 1,
+      "식품대분류명": "튀김류"
+    },
+    {
+      "식품명": "소시지조림",
+      "에너지(kcal)": 196,
+      "나트륨(mg)": 1128,
+      "cluster": 1,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "소시지볶음_채소",
+      "에너지(kcal)": 134,
+      "나트륨(mg)": 425,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "소시지볶음",
+      "에너지(kcal)": 132,
+      "나트륨(mg)": 423,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "소시지 케첩볶음",
+      "에너지(kcal)": 234,
+      "나트륨(mg)": 735,
+      "cluster": 1,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "소사태찜",
+      "에너지(kcal)": 137,
+      "나트륨(mg)": 246,
+      "cluster": 2,
+      "식품대분류명": "찜류"
+    },
+    {
+      "식품명": "소불고기_버섯",
+      "에너지(kcal)": 86,
+      "나트륨(mg)": 155,
+      "cluster": 0,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "소불고기",
+      "에너지(kcal)": 289,
+      "나트륨(mg)": 242,
+      "cluster": 2,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "소등심구이",
+      "에너지(kcal)": 311,
+      "나트륨(mg)": 255,
+      "cluster": 2,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "소등심 스테이크",
+      "에너지(kcal)": 223,
+      "나트륨(mg)": 110,
+      "cluster": 2,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "소고기채소볶음",
+      "에너지(kcal)": 198,
+      "나트륨(mg)": 478,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "소고기육개장",
+      "에너지(kcal)": 32,
+      "나트륨(mg)": 146,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "소고기볶음_고추장",
+      "에너지(kcal)": 157,
+      "나트륨(mg)": 210,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "소고기버섯죽",
+      "에너지(kcal)": 99,
+      "나트륨(mg)": 167,
+      "cluster": 2,
+      "식품대분류명": "죽 및 스프류"
+    },
+    {
+      "식품명": "소고기국_무_당면",
+      "에너지(kcal)": 34,
+      "나트륨(mg)": 6,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "소고기 장조림_메추리알",
+      "에너지(kcal)": 152,
+      "나트륨(mg)": 636,
+      "cluster": 1,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "소고기 장조림",
+      "에너지(kcal)": 237,
+      "나트륨(mg)": 537,
+      "cluster": 1,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "소고기 완자전",
+      "에너지(kcal)": 314,
+      "나트륨(mg)": 483,
+      "cluster": 1,
+      "식품대분류명": "전·적 및 부침류"
+    },
+    {
+      "식품명": "소고기 샌드위치",
+      "에너지(kcal)": 203,
+      "나트륨(mg)": 328,
+      "cluster": 2,
+      "식품대분류명": "빵 및 과자류"
+    },
+    {
+      "식품명": "소고기 미역국",
+      "에너지(kcal)": 23,
+      "나트륨(mg)": 217,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "소고기 무국",
+      "에너지(kcal)": 23,
+      "나트륨(mg)": 135,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "소고기 덮밥",
+      "에너지(kcal)": 120,
+      "나트륨(mg)": 77,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "소갈비찜",
+      "에너지(kcal)": 238,
+      "나트륨(mg)": 357,
+      "cluster": 2,
+      "식품대분류명": "찜류"
+    },
+    {
+      "식품명": "소갈비 구이",
+      "에너지(kcal)": 210,
+      "나트륨(mg)": 411,
+      "cluster": 2,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "세발낙지볶음",
+      "에너지(kcal)": 68,
+      "나트륨(mg)": 442,
+      "cluster": 0,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "생선까스",
+      "에너지(kcal)": 198,
+      "나트륨(mg)": 413,
+      "cluster": 2,
+      "식품대분류명": "튀김류"
+    },
+    {
+      "식품명": "샐러드_감자",
+      "에너지(kcal)": 163,
+      "나트륨(mg)": 316,
+      "cluster": 2,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "새우튀김",
+      "에너지(kcal)": 145,
+      "나트륨(mg)": 321,
+      "cluster": 2,
+      "식품대분류명": "튀김류"
+    },
+    {
+      "식품명": "새우탕",
+      "에너지(kcal)": 40,
+      "나트륨(mg)": 217,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "새우 탕수",
+      "에너지(kcal)": 149,
+      "나트륨(mg)": 189,
+      "cluster": 2,
+      "식품대분류명": "튀김류"
+    },
+    {
+      "식품명": "새송이버섯 구이",
+      "에너지(kcal)": 58,
+      "나트륨(mg)": 200,
+      "cluster": 0,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "상추겉절이",
+      "에너지(kcal)": 24,
+      "나트륨(mg)": 168,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "상추 겉절이",
+      "에너지(kcal)": 24,
+      "나트륨(mg)": 175,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "삼치튀김",
+      "에너지(kcal)": 136,
+      "나트륨(mg)": 929,
+      "cluster": 1,
+      "식품대분류명": "튀김류"
+    },
+    {
+      "식품명": "삼치조림",
+      "에너지(kcal)": 185,
+      "나트륨(mg)": 364,
+      "cluster": 2,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "삼치구이",
+      "에너지(kcal)": 77,
+      "나트륨(mg)": 159,
+      "cluster": 0,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "삼치 카레구이",
+      "에너지(kcal)": 213,
+      "나트륨(mg)": 320,
+      "cluster": 2,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "삼계탕",
+      "에너지(kcal)": 80,
+      "나트륨(mg)": 102,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "삶은 땅콩 조림",
+      "에너지(kcal)": 190,
+      "나트륨(mg)": 756,
+      "cluster": 1,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "뼈다귀해장국",
+      "에너지(kcal)": 21,
+      "나트륨(mg)": 108,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "비빔밥_참치_양념장",
+      "에너지(kcal)": 83,
+      "나트륨(mg)": 137,
+      "cluster": 0,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "비빔밥_참치",
+      "에너지(kcal)": 120,
+      "나트륨(mg)": 131,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "비빔밥_열무_양념장",
+      "에너지(kcal)": 114,
+      "나트륨(mg)": 189,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "비빔밥_열무",
+      "에너지(kcal)": 142,
+      "나트륨(mg)": 118,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "비빔밥_소고기_양념장",
+      "에너지(kcal)": 79,
+      "나트륨(mg)": 110,
+      "cluster": 0,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "비빔밥_돼지고기_양념장",
+      "에너지(kcal)": 90,
+      "나트륨(mg)": 129,
+      "cluster": 0,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "비빔밥",
+      "에너지(kcal)": 171,
+      "나트륨(mg)": 291,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "비빔국수",
+      "에너지(kcal)": 188,
+      "나트륨(mg)": 559,
+      "cluster": 1,
+      "식품대분류명": "면 및 만두류"
+    },
+    {
+      "식품명": "비름나물_소금",
+      "에너지(kcal)": 47,
+      "나트륨(mg)": 292,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "브로콜리 버섯볶음",
+      "에너지(kcal)": 24,
+      "나트륨(mg)": 144,
+      "cluster": 0,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "브로콜리 두부무침",
+      "에너지(kcal)": 35,
+      "나트륨(mg)": 167,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "불낙전골",
+      "에너지(kcal)": 37,
+      "나트륨(mg)": 37,
+      "cluster": 0,
+      "식품대분류명": "찌개 및 전골류"
+    },
+    {
+      "식품명": "북어국_콩나물",
+      "에너지(kcal)": 18,
+      "나트륨(mg)": 177,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "북어국_무_두부",
+      "에너지(kcal)": 20,
+      "나트륨(mg)": 138,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "북어국_무",
+      "에너지(kcal)": 18,
+      "나트륨(mg)": 171,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "북어국_달걀",
+      "에너지(kcal)": 32,
+      "나트륨(mg)": 150,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "북어구이",
+      "에너지(kcal)": 287,
+      "나트륨(mg)": 932,
+      "cluster": 1,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "북어강정",
+      "에너지(kcal)": 320,
+      "나트륨(mg)": 1753,
+      "cluster": 1,
+      "식품대분류명": "튀김류"
+    },
+    {
+      "식품명": "부추전_해물",
+      "에너지(kcal)": 215,
+      "나트륨(mg)": 374,
+      "cluster": 2,
+      "식품대분류명": "전·적 및 부침류"
+    },
+    {
+      "식품명": "부추잡채",
+      "에너지(kcal)": 75,
+      "나트륨(mg)": 177,
+      "cluster": 0,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "부추무침_양파",
+      "에너지(kcal)": 19,
+      "나트륨(mg)": 133,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "부추무침_부추_채소",
+      "에너지(kcal)": 24,
+      "나트륨(mg)": 203,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "부추무침",
+      "에너지(kcal)": 59,
+      "나트륨(mg)": 695,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "부추 초무침",
+      "에너지(kcal)": 23,
+      "나트륨(mg)": 187,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "부대찌개",
+      "에너지(kcal)": 57,
+      "나트륨(mg)": 346,
+      "cluster": 0,
+      "식품대분류명": "찌개 및 전골류"
+    },
+    {
+      "식품명": "볶음밥_햄",
+      "에너지(kcal)": 218,
+      "나트륨(mg)": 251,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "볶음밥_해물",
+      "에너지(kcal)": 106,
+      "나트륨(mg)": 148,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "볶음밥_채소",
+      "에너지(kcal)": 115,
+      "나트륨(mg)": 107,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "볶음밥_참치_김치",
+      "에너지(kcal)": 150,
+      "나트륨(mg)": 218,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "볶음밥_소고기",
+      "에너지(kcal)": 119,
+      "나트륨(mg)": 51,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "볶음밥_새우",
+      "에너지(kcal)": 85,
+      "나트륨(mg)": 95,
+      "cluster": 0,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "볶음밥_배추김치_돼지고기",
+      "에너지(kcal)": 113,
+      "나트륨(mg)": 165,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "볶음밥_김치_돼지고기",
+      "에너지(kcal)": 193,
+      "나트륨(mg)": 134,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "볶음밥_계란",
+      "에너지(kcal)": 164,
+      "나트륨(mg)": 110,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "볶음 우동",
+      "에너지(kcal)": 80,
+      "나트륨(mg)": 314,
+      "cluster": 0,
+      "식품대분류명": "면 및 만두류"
+    },
+    {
+      "식품명": "보리밥",
+      "에너지(kcal)": 120,
+      "나트륨(mg)": 2,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "베이컨떡말이구이",
+      "에너지(kcal)": 239,
+      "나트륨(mg)": 594,
+      "cluster": 1,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "버섯찌개",
+      "에너지(kcal)": 32,
+      "나트륨(mg)": 167,
+      "cluster": 0,
+      "식품대분류명": "찌개 및 전골류"
+    },
+    {
+      "식품명": "버섯전골",
+      "에너지(kcal)": 36,
+      "나트륨(mg)": 285,
+      "cluster": 0,
+      "식품대분류명": "찌개 및 전골류"
+    },
+    {
+      "식품명": "버섯전",
+      "에너지(kcal)": 202,
+      "나트륨(mg)": 770,
+      "cluster": 1,
+      "식품대분류명": "전·적 및 부침류"
+    },
+    {
+      "식품명": "버섯 매운탕",
+      "에너지(kcal)": 45,
+      "나트륨(mg)": 160,
+      "cluster": 0,
+      "식품대분류명": "찌개 및 전골류"
+    },
+    {
+      "식품명": "배추숙주나물",
+      "에너지(kcal)": 22,
+      "나트륨(mg)": 127,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "배추나물",
+      "에너지(kcal)": 53,
+      "나트륨(mg)": 564,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "배추국_들깨",
+      "에너지(kcal)": 21,
+      "나트륨(mg)": 205,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "배추국",
+      "에너지(kcal)": 9,
+      "나트륨(mg)": 113,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "배추겉절이",
+      "에너지(kcal)": 40,
+      "나트륨(mg)": 633,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "배추 된장국_소고기",
+      "에너지(kcal)": 30,
+      "나트륨(mg)": 181,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "배추 된장국",
+      "에너지(kcal)": 13,
+      "나트륨(mg)": 248,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "배추 겉절이",
+      "에너지(kcal)": 41,
+      "나트륨(mg)": 654,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "밤밥",
+      "에너지(kcal)": 152,
+      "나트륨(mg)": 3,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "바지락국",
+      "에너지(kcal)": 17,
+      "나트륨(mg)": 225,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "바지락 미역국",
+      "에너지(kcal)": 13,
+      "나트륨(mg)": 304,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "미트볼조림",
+      "에너지(kcal)": 156,
+      "나트륨(mg)": 501,
+      "cluster": 2,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "미역줄기볶음_미역줄기_채소",
+      "에너지(kcal)": 35,
+      "나트륨(mg)": 1287,
+      "cluster": 1,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "미역줄기볶음",
+      "에너지(kcal)": 60,
+      "나트륨(mg)": 473,
+      "cluster": 0,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "미역국_소고기",
+      "에너지(kcal)": 23,
+      "나트륨(mg)": 203,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "미역국_북어",
+      "에너지(kcal)": 11,
+      "나트륨(mg)": 266,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "미역국_들깨",
+      "에너지(kcal)": 17,
+      "나트륨(mg)": 194,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "미역국",
+      "에너지(kcal)": 7,
+      "나트륨(mg)": 427,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "미숫가루(선식)음료",
+      "에너지(kcal)": 128,
+      "나트륨(mg)": 1,
+      "cluster": 2,
+      "식품대분류명": "음료 및 차류"
+    },
+    {
+      "식품명": "미소된장국",
+      "에너지(kcal)": 26,
+      "나트륨(mg)": 324,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "미나리 초무침",
+      "에너지(kcal)": 49,
+      "나트륨(mg)": 575,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "물만두",
+      "에너지(kcal)": 98,
+      "나트륨(mg)": 93,
+      "cluster": 2,
+      "식품대분류명": "면 및 만두류"
+    },
+    {
+      "식품명": "물냉면",
+      "에너지(kcal)": 83,
+      "나트륨(mg)": 369,
+      "cluster": 0,
+      "식품대분류명": "면 및 만두류"
+    },
+    {
+      "식품명": "무조림",
+      "에너지(kcal)": 48,
+      "나트륨(mg)": 1135,
+      "cluster": 1,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "무생채_액젓",
+      "에너지(kcal)": 42,
+      "나트륨(mg)": 326,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "무생채_식초",
+      "에너지(kcal)": 42,
+      "나트륨(mg)": 322,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "무생채_미역",
+      "에너지(kcal)": 34,
+      "나트륨(mg)": 748,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "무생채",
+      "에너지(kcal)": 32,
+      "나트륨(mg)": 615,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "무말랭이무침_오징어",
+      "에너지(kcal)": 150,
+      "나트륨(mg)": 283,
+      "cluster": 2,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "무말랭이무침",
+      "에너지(kcal)": 61,
+      "나트륨(mg)": 277,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "무나물",
+      "에너지(kcal)": 36,
+      "나트륨(mg)": 637,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "무국_어묵",
+      "에너지(kcal)": 22,
+      "나트륨(mg)": 233,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "무국_소고기_두부",
+      "에너지(kcal)": 27,
+      "나트륨(mg)": 100,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "무국_소고기",
+      "에너지(kcal)": 26,
+      "나트륨(mg)": 179,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "무국_들깨",
+      "에너지(kcal)": 15,
+      "나트륨(mg)": 165,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "무 어묵조림",
+      "에너지(kcal)": 112,
+      "나트륨(mg)": 622,
+      "cluster": 1,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "무 북어국",
+      "에너지(kcal)": 18,
+      "나트륨(mg)": 180,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "무 된장국",
+      "에너지(kcal)": 18,
+      "나트륨(mg)": 254,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "모밀국수",
+      "에너지(kcal)": 126,
+      "나트륨(mg)": 349,
+      "cluster": 2,
+      "식품대분류명": "면 및 만두류"
+    },
+    {
+      "식품명": "모듬버섯볶음",
+      "에너지(kcal)": 69,
+      "나트륨(mg)": 430,
+      "cluster": 0,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "모듬배추나물_된장",
+      "에너지(kcal)": 31,
+      "나트륨(mg)": 322,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "멸치조림",
+      "에너지(kcal)": 150,
+      "나트륨(mg)": 1121,
+      "cluster": 1,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "멸치볶음_견과류",
+      "에너지(kcal)": 172,
+      "나트륨(mg)": 530,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "메추리알장조림",
+      "에너지(kcal)": 151,
+      "나트륨(mg)": 983,
+      "cluster": 1,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "메추리알 돼지고기장조림",
+      "에너지(kcal)": 144,
+      "나트륨(mg)": 295,
+      "cluster": 2,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "메밀묵국",
+      "에너지(kcal)": 61,
+      "나트륨(mg)": 231,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "매운 어묵볶음",
+      "에너지(kcal)": 90,
+      "나트륨(mg)": 397,
+      "cluster": 0,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "맛살전",
+      "에너지(kcal)": 230,
+      "나트륨(mg)": 962,
+      "cluster": 1,
+      "식품대분류명": "전·적 및 부침류"
+    },
+    {
+      "식품명": "만두탕수",
+      "에너지(kcal)": 88,
+      "나트륨(mg)": 118,
+      "cluster": 0,
+      "식품대분류명": "면 및 만두류"
+    },
+    {
+      "식품명": "만두국_고기만두",
+      "에너지(kcal)": 59,
+      "나트륨(mg)": 190,
+      "cluster": 0,
+      "식품대분류명": "면 및 만두류"
+    },
+    {
+      "식품명": "막국수",
+      "에너지(kcal)": 216,
+      "나트륨(mg)": 734,
+      "cluster": 1,
+      "식품대분류명": "면 및 만두류"
+    },
+    {
+      "식품명": "마파두부",
+      "에너지(kcal)": 146,
+      "나트륨(mg)": 172,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "마카로니 샐러드",
+      "에너지(kcal)": 139,
+      "나트륨(mg)": 123,
+      "cluster": 2,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "마늘쫑장아찌무침",
+      "에너지(kcal)": 79,
+      "나트륨(mg)": 706,
+      "cluster": 1,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "런천미트구이",
+      "에너지(kcal)": 303,
+      "나트륨(mg)": 1087,
+      "cluster": 1,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "라면",
+      "에너지(kcal)": 169,
+      "나트륨(mg)": 128,
+      "cluster": 2,
+      "식품대분류명": "면 및 만두류"
+    },
+    {
+      "식품명": "떡산적_소고기",
+      "에너지(kcal)": 255,
+      "나트륨(mg)": 453,
+      "cluster": 1,
+      "식품대분류명": "전·적 및 부침류"
+    },
+    {
+      "식품명": "떡볶이_어묵",
+      "에너지(kcal)": 130,
+      "나트륨(mg)": 367,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "떡볶이_소고기",
+      "에너지(kcal)": 157,
+      "나트륨(mg)": 316,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "떡볶이_모듬",
+      "에너지(kcal)": 125,
+      "나트륨(mg)": 332,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "떡볶이_고추장_어묵",
+      "에너지(kcal)": 161,
+      "나트륨(mg)": 456,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "떡볶이_고추장_메추리알",
+      "에너지(kcal)": 100,
+      "나트륨(mg)": 255,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "떡볶이_간장",
+      "에너지(kcal)": 145,
+      "나트륨(mg)": 325,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "떡볶이",
+      "에너지(kcal)": 258,
+      "나트륨(mg)": 673,
+      "cluster": 1,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "떡만두국_고기만두",
+      "에너지(kcal)": 67,
+      "나트륨(mg)": 165,
+      "cluster": 0,
+      "식품대분류명": "면 및 만두류"
+    },
+    {
+      "식품명": "떡만두국",
+      "에너지(kcal)": 86,
+      "나트륨(mg)": 134,
+      "cluster": 0,
+      "식품대분류명": "면 및 만두류"
+    },
+    {
+      "식품명": "떡국_소고기_달걀",
+      "에너지(kcal)": 99,
+      "나트륨(mg)": 245,
+      "cluster": 2,
+      "식품대분류명": "면 및 만두류"
+    },
+    {
+      "식품명": "떡국_소고기",
+      "에너지(kcal)": 99,
+      "나트륨(mg)": 245,
+      "cluster": 2,
+      "식품대분류명": "면 및 만두류"
+    },
+    {
+      "식품명": "떡국_달걀",
+      "에너지(kcal)": 85,
+      "나트륨(mg)": 178,
+      "cluster": 0,
+      "식품대분류명": "면 및 만두류"
+    },
+    {
+      "식품명": "떡강정",
+      "에너지(kcal)": 202,
+      "나트륨(mg)": 282,
+      "cluster": 2,
+      "식품대분류명": "튀김류"
+    },
+    {
+      "식품명": "등심돈가스",
+      "에너지(kcal)": 174,
+      "나트륨(mg)": 250,
+      "cluster": 2,
+      "식품대분류명": "튀김류"
+    },
+    {
+      "식품명": "들깨국",
+      "에너지(kcal)": 15,
+      "나트륨(mg)": 155,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "두부튀김",
+      "에너지(kcal)": 122,
+      "나트륨(mg)": 264,
+      "cluster": 2,
+      "식품대분류명": "튀김류"
+    },
+    {
+      "식품명": "두부찌개_굴",
+      "에너지(kcal)": 21,
+      "나트륨(mg)": 185,
+      "cluster": 0,
+      "식품대분류명": "찌개 및 전골류"
+    },
+    {
+      "식품명": "두부조림_돼지고기",
+      "에너지(kcal)": 175,
+      "나트륨(mg)": 517,
+      "cluster": 2,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "두부조림",
+      "에너지(kcal)": 138,
+      "나트륨(mg)": 353,
+      "cluster": 2,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "두부전",
+      "에너지(kcal)": 161,
+      "나트륨(mg)": 349,
+      "cluster": 2,
+      "식품대분류명": "전·적 및 부침류"
+    },
+    {
+      "식품명": "두부부침",
+      "에너지(kcal)": 187,
+      "나트륨(mg)": 349,
+      "cluster": 2,
+      "식품대분류명": "전·적 및 부침류"
+    },
+    {
+      "식품명": "두부냉채",
+      "에너지(kcal)": 78,
+      "나트륨(mg)": 311,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "두부국",
+      "에너지(kcal)": 31,
+      "나트륨(mg)": 214,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "두부 탕수",
+      "에너지(kcal)": 123,
+      "나트륨(mg)": 192,
+      "cluster": 2,
+      "식품대분류명": "튀김류"
+    },
+    {
+      "식품명": "두부 청국장찌개_김치",
+      "에너지(kcal)": 44,
+      "나트륨(mg)": 185,
+      "cluster": 0,
+      "식품대분류명": "찌개 및 전골류"
+    },
+    {
+      "식품명": "두부 된장국",
+      "에너지(kcal)": 26,
+      "나트륨(mg)": 245,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "두부 달걀탕",
+      "에너지(kcal)": 37,
+      "나트륨(mg)": 93,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "된장찌개_호박",
+      "에너지(kcal)": 39,
+      "나트륨(mg)": 192,
+      "cluster": 0,
+      "식품대분류명": "찌개 및 전골류"
+    },
+    {
+      "식품명": "된장찌개_우렁",
+      "에너지(kcal)": 41,
+      "나트륨(mg)": 343,
+      "cluster": 0,
+      "식품대분류명": "찌개 및 전골류"
+    },
+    {
+      "식품명": "된장찌개_소고기",
+      "에너지(kcal)": 44,
+      "나트륨(mg)": 443,
+      "cluster": 0,
+      "식품대분류명": "찌개 및 전골류"
+    },
+    {
+      "식품명": "된장찌개_모듬채소",
+      "에너지(kcal)": 37,
+      "나트륨(mg)": 372,
+      "cluster": 0,
+      "식품대분류명": "찌개 및 전골류"
+    },
+    {
+      "식품명": "된장찌개",
+      "에너지(kcal)": 46,
+      "나트륨(mg)": 341,
+      "cluster": 0,
+      "식품대분류명": "찌개 및 전골류"
+    },
+    {
+      "식품명": "된장국_유부",
+      "에너지(kcal)": 26,
+      "나트륨(mg)": 208,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "된장국_얼갈이배추",
+      "에너지(kcal)": 14,
+      "나트륨(mg)": 216,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "된장국_아욱",
+      "에너지(kcal)": 16,
+      "나트륨(mg)": 250,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "된장국_시래기",
+      "에너지(kcal)": 17,
+      "나트륨(mg)": 271,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "된장국_시금치",
+      "에너지(kcal)": 15,
+      "나트륨(mg)": 261,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "된장국_미역",
+      "에너지(kcal)": 16,
+      "나트륨(mg)": 286,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "된장국_근대",
+      "에너지(kcal)": 14,
+      "나트륨(mg)": 240,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "돼지사태찜",
+      "에너지(kcal)": 109,
+      "나트륨(mg)": 220,
+      "cluster": 2,
+      "식품대분류명": "찜류"
+    },
+    {
+      "식품명": "돼지불고기_버섯",
+      "에너지(kcal)": 82,
+      "나트륨(mg)": 181,
+      "cluster": 0,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "돼지불고기_고추장",
+      "에너지(kcal)": 83,
+      "나트륨(mg)": 188,
+      "cluster": 0,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "돼지불고기_간장",
+      "에너지(kcal)": 79,
+      "나트륨(mg)": 181,
+      "cluster": 0,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "돼지등심 장조림",
+      "에너지(kcal)": 111,
+      "나트륨(mg)": 410,
+      "cluster": 2,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "돼지고기찜",
+      "에너지(kcal)": 109,
+      "나트륨(mg)": 220,
+      "cluster": 2,
+      "식품대분류명": "찜류"
+    },
+    {
+      "식품명": "돼지고기볶음_짜장",
+      "에너지(kcal)": 116,
+      "나트륨(mg)": 286,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "돼지고기볶음_돼지고기_채소",
+      "에너지(kcal)": 104,
+      "나트륨(mg)": 234,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "돼지고기볶음_돼지고기_짜장",
+      "에너지(kcal)": 112,
+      "나트륨(mg)": 291,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "돼지고기볶음_돼지고기_오징어",
+      "에너지(kcal)": 94,
+      "나트륨(mg)": 205,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "돼지고기볶음_돼지고기_버섯",
+      "에너지(kcal)": 99,
+      "나트륨(mg)": 257,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "돼지고기볶음_돼지고기_배추김치",
+      "에너지(kcal)": 94,
+      "나트륨(mg)": 263,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "돼지고기볶음_김치",
+      "에너지(kcal)": 99,
+      "나트륨(mg)": 256,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "돼지고기덮밥",
+      "에너지(kcal)": 165,
+      "나트륨(mg)": 143,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "돼지고기강정",
+      "에너지(kcal)": 174,
+      "나트륨(mg)": 493,
+      "cluster": 2,
+      "식품대분류명": "튀김류"
+    },
+    {
+      "식품명": "돼지고기 피망잡채",
+      "에너지(kcal)": 91,
+      "나트륨(mg)": 268,
+      "cluster": 0,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "돼지고기 장조림",
+      "에너지(kcal)": 133,
+      "나트륨(mg)": 349,
+      "cluster": 2,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "돼지고기 스테이크",
+      "에너지(kcal)": 183,
+      "나트륨(mg)": 603,
+      "cluster": 1,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "돼지고기 덮밥",
+      "에너지(kcal)": 168,
+      "나트륨(mg)": 141,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "돼지갈비찜_채소_떡",
+      "에너지(kcal)": 143,
+      "나트륨(mg)": 230,
+      "cluster": 2,
+      "식품대분류명": "찜류"
+    },
+    {
+      "식품명": "돼지갈비찜_채소",
+      "에너지(kcal)": 137,
+      "나트륨(mg)": 217,
+      "cluster": 2,
+      "식품대분류명": "찜류"
+    },
+    {
+      "식품명": "돼지갈비찜_매운양념_채소_떡",
+      "에너지(kcal)": 143,
+      "나트륨(mg)": 245,
+      "cluster": 2,
+      "식품대분류명": "찜류"
+    },
+    {
+      "식품명": "돼지갈비찜_매운양념_채소",
+      "에너지(kcal)": 130,
+      "나트륨(mg)": 225,
+      "cluster": 2,
+      "식품대분류명": "찜류"
+    },
+    {
+      "식품명": "돼지갈비찜",
+      "에너지(kcal)": 140,
+      "나트륨(mg)": 218,
+      "cluster": 2,
+      "식품대분류명": "찜류"
+    },
+    {
+      "식품명": "돼지갈비전골",
+      "에너지(kcal)": 227,
+      "나트륨(mg)": 332,
+      "cluster": 2,
+      "식품대분류명": "찌개 및 전골류"
+    },
+    {
+      "식품명": "돼지갈비구이",
+      "에너지(kcal)": 132,
+      "나트륨(mg)": 215,
+      "cluster": 2,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "돼지갈비강정",
+      "에너지(kcal)": 244,
+      "나트륨(mg)": 502,
+      "cluster": 1,
+      "식품대분류명": "튀김류"
+    },
+    {
+      "식품명": "동태찌개",
+      "에너지(kcal)": 24,
+      "나트륨(mg)": 207,
+      "cluster": 0,
+      "식품대분류명": "찌개 및 전골류"
+    },
+    {
+      "식품명": "동태전",
+      "에너지(kcal)": 239,
+      "나트륨(mg)": 388,
+      "cluster": 2,
+      "식품대분류명": "전·적 및 부침류"
+    },
+    {
+      "식품명": "동태국",
+      "에너지(kcal)": 21,
+      "나트륨(mg)": 246,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "동태 매운탕",
+      "에너지(kcal)": 25,
+      "나트륨(mg)": 184,
+      "cluster": 0,
+      "식품대분류명": "찌개 및 전골류"
+    },
+    {
+      "식품명": "돌나물",
+      "에너지(kcal)": 42,
+      "나트륨(mg)": 193,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "도토리묵무침_채소",
+      "에너지(kcal)": 61,
+      "나트륨(mg)": 337,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "도토리묵무침",
+      "에너지(kcal)": 53,
+      "나트륨(mg)": 148,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "도라지생채_오이",
+      "에너지(kcal)": 42,
+      "나트륨(mg)": 285,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "도라지생채",
+      "에너지(kcal)": 78,
+      "나트륨(mg)": 297,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "도라지나물",
+      "에너지(kcal)": 39,
+      "나트륨(mg)": 333,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "더덕무침",
+      "에너지(kcal)": 111,
+      "나트륨(mg)": 1056,
+      "cluster": 1,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "대구지리",
+      "에너지(kcal)": 19,
+      "나트륨(mg)": 171,
+      "cluster": 0,
+      "식품대분류명": "찌개 및 전골류"
+    },
+    {
+      "식품명": "닭튀김_양념",
+      "에너지(kcal)": 128,
+      "나트륨(mg)": 206,
+      "cluster": 2,
+      "식품대분류명": "튀김류"
+    },
+    {
+      "식품명": "닭튀김 샐러드",
+      "에너지(kcal)": 79,
+      "나트륨(mg)": 102,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "닭튀김",
+      "에너지(kcal)": 153,
+      "나트륨(mg)": 237,
+      "cluster": 2,
+      "식품대분류명": "튀김류"
+    },
+    {
+      "식품명": "닭찜_매운양념",
+      "에너지(kcal)": 114,
+      "나트륨(mg)": 229,
+      "cluster": 2,
+      "식품대분류명": "찜류"
+    },
+    {
+      "식품명": "닭찜_간장",
+      "에너지(kcal)": 109,
+      "나트륨(mg)": 208,
+      "cluster": 2,
+      "식품대분류명": "찜류"
+    },
+    {
+      "식품명": "닭죽_채소",
+      "에너지(kcal)": 115,
+      "나트륨(mg)": 157,
+      "cluster": 2,
+      "식품대분류명": "죽 및 스프류"
+    },
+    {
+      "식품명": "닭죽",
+      "에너지(kcal)": 112,
+      "나트륨(mg)": 191,
+      "cluster": 2,
+      "식품대분류명": "죽 및 스프류"
+    },
+    {
+      "식품명": "닭조림",
+      "에너지(kcal)": 121,
+      "나트륨(mg)": 220,
+      "cluster": 2,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "닭볶음(닭갈비)_매운양념_치즈",
+      "에너지(kcal)": 168,
+      "나트륨(mg)": 301,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "닭볶음(닭갈비)_매운양념",
+      "에너지(kcal)": 131,
+      "나트륨(mg)": 273,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "닭볶음(닭갈비)",
+      "에너지(kcal)": 132,
+      "나트륨(mg)": 278,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "닭도리탕",
+      "에너지(kcal)": 116,
+      "나트륨(mg)": 299,
+      "cluster": 2,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "닭다리구이",
+      "에너지(kcal)": 88,
+      "나트륨(mg)": 175,
+      "cluster": 0,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "닭날개구이",
+      "에너지(kcal)": 121,
+      "나트륨(mg)": 250,
+      "cluster": 2,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "닭구이",
+      "에너지(kcal)": 110,
+      "나트륨(mg)": 243,
+      "cluster": 2,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "닭곰탕",
+      "에너지(kcal)": 59,
+      "나트륨(mg)": 160,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "닭고기육개장",
+      "에너지(kcal)": 43,
+      "나트륨(mg)": 159,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "닭고기냉채",
+      "에너지(kcal)": 64,
+      "나트륨(mg)": 18,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "닭고기 샐러드",
+      "에너지(kcal)": 88,
+      "나트륨(mg)": 394,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "닭고기 미역국",
+      "에너지(kcal)": 21,
+      "나트륨(mg)": 191,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "닭고기 덮밥",
+      "에너지(kcal)": 102,
+      "나트륨(mg)": 118,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "닭강정",
+      "에너지(kcal)": 146,
+      "나트륨(mg)": 355,
+      "cluster": 2,
+      "식품대분류명": "튀김류"
+    },
+    {
+      "식품명": "달래무침",
+      "에너지(kcal)": 82,
+      "나트륨(mg)": 364,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "달래 된장국",
+      "에너지(kcal)": 38,
+      "나트륨(mg)": 188,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "달걀후라이",
+      "에너지(kcal)": 178,
+      "나트륨(mg)": 218,
+      "cluster": 2,
+      "식품대분류명": "전·적 및 부침류"
+    },
+    {
+      "식품명": "달걀찜_새우젓",
+      "에너지(kcal)": 71,
+      "나트륨(mg)": 664,
+      "cluster": 0,
+      "식품대분류명": "찜류"
+    },
+    {
+      "식품명": "달걀찜_당근",
+      "에너지(kcal)": 69,
+      "나트륨(mg)": 218,
+      "cluster": 0,
+      "식품대분류명": "찜류"
+    },
+    {
+      "식품명": "달걀찜",
+      "에너지(kcal)": 119,
+      "나트륨(mg)": 871,
+      "cluster": 1,
+      "식품대분류명": "찜류"
+    },
+    {
+      "식품명": "달걀조림",
+      "에너지(kcal)": 84,
+      "나트륨(mg)": 507,
+      "cluster": 0,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "달걀부침(달걀후라이)",
+      "에너지(kcal)": 178,
+      "나트륨(mg)": 218,
+      "cluster": 2,
+      "식품대분류명": "전·적 및 부침류"
+    },
+    {
+      "식품명": "달걀말이_채소",
+      "에너지(kcal)": 167,
+      "나트륨(mg)": 327,
+      "cluster": 2,
+      "식품대분류명": "전·적 및 부침류"
+    },
+    {
+      "식품명": "달걀말이_부추",
+      "에너지(kcal)": 102,
+      "나트륨(mg)": 186,
+      "cluster": 2,
+      "식품대분류명": "전·적 및 부침류"
+    },
+    {
+      "식품명": "달걀말이",
+      "에너지(kcal)": 169,
+      "나트륨(mg)": 661,
+      "cluster": 1,
+      "식품대분류명": "전·적 및 부침류"
+    },
+    {
+      "식품명": "달걀국",
+      "에너지(kcal)": 22,
+      "나트륨(mg)": 205,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "달걀 샐러드",
+      "에너지(kcal)": 96,
+      "나트륨(mg)": 165,
+      "cluster": 2,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "단무지무침",
+      "에너지(kcal)": 33,
+      "나트륨(mg)": 590,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "다시마조림",
+      "에너지(kcal)": 61,
+      "나트륨(mg)": 518,
+      "cluster": 0,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "다슬기 된장국",
+      "에너지(kcal)": 22,
+      "나트륨(mg)": 136,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "느타리버섯볶음_느타리버섯_채소",
+      "에너지(kcal)": 37,
+      "나트륨(mg)": 184,
+      "cluster": 0,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "느타리버섯볶음",
+      "에너지(kcal)": 56,
+      "나트륨(mg)": 198,
+      "cluster": 0,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "녹두전",
+      "에너지(kcal)": 92,
+      "나트륨(mg)": 23,
+      "cluster": 2,
+      "식품대분류명": "전·적 및 부침류"
+    },
+    {
+      "식품명": "녹두빈대떡_해물_돼지고기",
+      "에너지(kcal)": 103,
+      "나트륨(mg)": 560,
+      "cluster": 2,
+      "식품대분류명": "전·적 및 부침류"
+    },
+    {
+      "식품명": "녹두빈대떡",
+      "에너지(kcal)": 193,
+      "나트륨(mg)": 311,
+      "cluster": 2,
+      "식품대분류명": "전·적 및 부침류"
+    },
+    {
+      "식품명": "노각무침",
+      "에너지(kcal)": 66,
+      "나트륨(mg)": 1273,
+      "cluster": 1,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "냉이 된장국",
+      "에너지(kcal)": 15,
+      "나트륨(mg)": 195,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "낙지볶음",
+      "에너지(kcal)": 136,
+      "나트륨(mg)": 977,
+      "cluster": 1,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "낙지 비빔밥",
+      "에너지(kcal)": 88,
+      "나트륨(mg)": 176,
+      "cluster": 0,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "낙지 덮밥",
+      "에너지(kcal)": 92,
+      "나트륨(mg)": 146,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "꽈리고추볶음_잔멸치_호두",
+      "에너지(kcal)": 72,
+      "나트륨(mg)": 485,
+      "cluster": 0,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "꽈리고추볶음_잔멸치",
+      "에너지(kcal)": 152,
+      "나트륨(mg)": 988,
+      "cluster": 1,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "꽃게탕",
+      "에너지(kcal)": 23,
+      "나트륨(mg)": 223,
+      "cluster": 0,
+      "식품대분류명": "찌개 및 전골류"
+    },
+    {
+      "식품명": "꽁치조림_배추김치",
+      "에너지(kcal)": 81,
+      "나트륨(mg)": 396,
+      "cluster": 0,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "꽁치조림_무",
+      "에너지(kcal)": 83,
+      "나트륨(mg)": 321,
+      "cluster": 0,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "꽁치조림",
+      "에너지(kcal)": 129,
+      "나트륨(mg)": 368,
+      "cluster": 2,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "꽁치구이",
+      "에너지(kcal)": 215,
+      "나트륨(mg)": 646,
+      "cluster": 1,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "꼬치구이_닭고기",
+      "에너지(kcal)": 115,
+      "나트륨(mg)": 116,
+      "cluster": 2,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "깻잎튀김",
+      "에너지(kcal)": 191,
+      "나트륨(mg)": 564,
+      "cluster": 1,
+      "식품대분류명": "튀김류"
+    },
+    {
+      "식품명": "깻잎찜",
+      "에너지(kcal)": 59,
+      "나트륨(mg)": 615,
+      "cluster": 0,
+      "식품대분류명": "찜류"
+    },
+    {
+      "식품명": "깻잎나물",
+      "에너지(kcal)": 63,
+      "나트륨(mg)": 204,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "깐풍기",
+      "에너지(kcal)": 156,
+      "나트륨(mg)": 637,
+      "cluster": 1,
+      "식품대분류명": "튀김류"
+    },
+    {
+      "식품명": "김치찜_돼지고기",
+      "에너지(kcal)": 77,
+      "나트륨(mg)": 201,
+      "cluster": 0,
+      "식품대분류명": "찜류"
+    },
+    {
+      "식품명": "김치찌개_햄",
+      "에너지(kcal)": 39,
+      "나트륨(mg)": 235,
+      "cluster": 0,
+      "식품대분류명": "찌개 및 전골류"
+    },
+    {
+      "식품명": "김치찌개_참치",
+      "에너지(kcal)": 36,
+      "나트륨(mg)": 300,
+      "cluster": 0,
+      "식품대분류명": "찌개 및 전골류"
+    },
+    {
+      "식품명": "김치찌개_돼지고기_두부",
+      "에너지(kcal)": 41,
+      "나트륨(mg)": 294,
+      "cluster": 0,
+      "식품대분류명": "찌개 및 전골류"
+    },
+    {
+      "식품명": "김치찌개",
+      "에너지(kcal)": 19,
+      "나트륨(mg)": 190,
+      "cluster": 0,
+      "식품대분류명": "찌개 및 전골류"
+    },
+    {
+      "식품명": "김치전_해물",
+      "에너지(kcal)": 68,
+      "나트륨(mg)": 178,
+      "cluster": 0,
+      "식품대분류명": "전·적 및 부침류"
+    },
+    {
+      "식품명": "김치전_오징어",
+      "에너지(kcal)": 162,
+      "나트륨(mg)": 496,
+      "cluster": 2,
+      "식품대분류명": "전·적 및 부침류"
+    },
+    {
+      "식품명": "김치순두부_해물",
+      "에너지(kcal)": 35,
+      "나트륨(mg)": 191,
+      "cluster": 0,
+      "식품대분류명": "찌개 및 전골류"
+    },
+    {
+      "식품명": "김치순두부_바지락",
+      "에너지(kcal)": 50,
+      "나트륨(mg)": 393,
+      "cluster": 0,
+      "식품대분류명": "찌개 및 전골류"
+    },
+    {
+      "식품명": "김치순두부",
+      "에너지(kcal)": 42,
+      "나트륨(mg)": 107,
+      "cluster": 0,
+      "식품대분류명": "찌개 및 전골류"
+    },
+    {
+      "식품명": "김치볶음_햄",
+      "에너지(kcal)": 188,
+      "나트륨(mg)": 1045,
+      "cluster": 1,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "김치볶음_참치",
+      "에너지(kcal)": 64,
+      "나트륨(mg)": 343,
+      "cluster": 0,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "김치볶음_돼지고기",
+      "에너지(kcal)": 161,
+      "나트륨(mg)": 592,
+      "cluster": 1,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "김치볶음_김치_참치",
+      "에너지(kcal)": 57,
+      "나트륨(mg)": 462,
+      "cluster": 0,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "김치볶음_김치",
+      "에너지(kcal)": 54,
+      "나트륨(mg)": 457,
+      "cluster": 0,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "김치볶음",
+      "에너지(kcal)": 60,
+      "나트륨(mg)": 444,
+      "cluster": 0,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "김치만두",
+      "에너지(kcal)": 76,
+      "나트륨(mg)": 344,
+      "cluster": 0,
+      "식품대분류명": "면 및 만두류"
+    },
+    {
+      "식품명": "김치국_콩나물",
+      "에너지(kcal)": 8,
+      "나트륨(mg)": 113,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "김치국_두부",
+      "에너지(kcal)": 18,
+      "나트륨(mg)": 129,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "김치국_김치_콩나물",
+      "에너지(kcal)": 12,
+      "나트륨(mg)": 190,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "김치 콩나물국",
+      "에너지(kcal)": 10,
+      "나트륨(mg)": 258,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "김치 청국장찌개",
+      "에너지(kcal)": 30,
+      "나트륨(mg)": 191,
+      "cluster": 0,
+      "식품대분류명": "찌개 및 전골류"
+    },
+    {
+      "식품명": "김치 볶음밥_모듬",
+      "에너지(kcal)": 129,
+      "나트륨(mg)": 153,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "김치 고기만두",
+      "에너지(kcal)": 294,
+      "나트륨(mg)": 552,
+      "cluster": 1,
+      "식품대분류명": "면 및 만두류"
+    },
+    {
+      "식품명": "김밥_채소",
+      "에너지(kcal)": 102,
+      "나트륨(mg)": 153,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "김밥_참치",
+      "에너지(kcal)": 129,
+      "나트륨(mg)": 234,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "김말이튀김",
+      "에너지(kcal)": 132,
+      "나트륨(mg)": 183,
+      "cluster": 2,
+      "식품대분류명": "튀김류"
+    },
+    {
+      "식품명": "기장밥_찹쌀",
+      "에너지(kcal)": 121,
+      "나트륨(mg)": 1,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "기장밥",
+      "에너지(kcal)": 121,
+      "나트륨(mg)": 2,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "근대나물",
+      "에너지(kcal)": 50,
+      "나트륨(mg)": 724,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "근대 된장국",
+      "에너지(kcal)": 14,
+      "나트륨(mg)": 240,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "굴비구이",
+      "에너지(kcal)": 524,
+      "나트륨(mg)": 549,
+      "cluster": 1,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "굴국_두부",
+      "에너지(kcal)": 19,
+      "나트륨(mg)": 182,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "군만두",
+      "에너지(kcal)": 219,
+      "나트륨(mg)": 237,
+      "cluster": 2,
+      "식품대분류명": "면 및 만두류"
+    },
+    {
+      "식품명": "국수_열무김치",
+      "에너지(kcal)": 120,
+      "나트륨(mg)": 412,
+      "cluster": 2,
+      "식품대분류명": "면 및 만두류"
+    },
+    {
+      "식품명": "과일샐러드",
+      "에너지(kcal)": 102,
+      "나트륨(mg)": 53,
+      "cluster": 2,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "곰탕",
+      "에너지(kcal)": 68,
+      "나트륨(mg)": 302,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "골뱅이무침_채소",
+      "에너지(kcal)": 59,
+      "나트륨(mg)": 333,
+      "cluster": 0,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "골뱅이무침",
+      "에너지(kcal)": 118,
+      "나트륨(mg)": 494,
+      "cluster": 2,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "곤약조림",
+      "에너지(kcal)": 43,
+      "나트륨(mg)": 336,
+      "cluster": 0,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "곤드레밥",
+      "에너지(kcal)": 124,
+      "나트륨(mg)": 9,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "고춧잎나물",
+      "에너지(kcal)": 101,
+      "나트륨(mg)": 420,
+      "cluster": 2,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "고추튀김",
+      "에너지(kcal)": 177,
+      "나트륨(mg)": 241,
+      "cluster": 2,
+      "식품대분류명": "튀김류"
+    },
+    {
+      "식품명": "고추장찌개_두부",
+      "에너지(kcal)": 49,
+      "나트륨(mg)": 227,
+      "cluster": 0,
+      "식품대분류명": "찌개 및 전골류"
+    },
+    {
+      "식품명": "고추장볶음",
+      "에너지(kcal)": 376,
+      "나트륨(mg)": 1604,
+      "cluster": 1,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "고추잡채",
+      "에너지(kcal)": 91,
+      "나트륨(mg)": 268,
+      "cluster": 0,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "고사리나물",
+      "에너지(kcal)": 43,
+      "나트륨(mg)": 522,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "고디국(다슬기맑은국)",
+      "에너지(kcal)": 17,
+      "나트륨(mg)": 96,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "고등어조림_배추김치",
+      "에너지(kcal)": 82,
+      "나트륨(mg)": 330,
+      "cluster": 0,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "고등어조림_무",
+      "에너지(kcal)": 94,
+      "나트륨(mg)": 310,
+      "cluster": 2,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "고등어조림",
+      "에너지(kcal)": 114,
+      "나트륨(mg)": 205,
+      "cluster": 2,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "고등어구이_카레",
+      "에너지(kcal)": 190,
+      "나트륨(mg)": 247,
+      "cluster": 2,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "고등어구이_기름",
+      "에너지(kcal)": 177,
+      "나트륨(mg)": 238,
+      "cluster": 2,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "고등어구이",
+      "에너지(kcal)": 176,
+      "나트륨(mg)": 239,
+      "cluster": 2,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "고기만두",
+      "에너지(kcal)": 99,
+      "나트륨(mg)": 148,
+      "cluster": 2,
+      "식품대분류명": "면 및 만두류"
+    },
+    {
+      "식품명": "고구마튀김",
+      "에너지(kcal)": 182,
+      "나트륨(mg)": 4,
+      "cluster": 2,
+      "식품대분류명": "튀김류"
+    },
+    {
+      "식품명": "고구마줄기나물_고춧가루",
+      "에너지(kcal)": 27,
+      "나트륨(mg)": 157,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "고구마줄기나물",
+      "에너지(kcal)": 60,
+      "나트륨(mg)": 1659,
+      "cluster": 1,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "고구마조림",
+      "에너지(kcal)": 167,
+      "나트륨(mg)": 839,
+      "cluster": 1,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "고구마밥",
+      "에너지(kcal)": 139,
+      "나트륨(mg)": 2,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "고구마맛탕",
+      "에너지(kcal)": 143,
+      "나트륨(mg)": 30,
+      "cluster": 2,
+      "식품대분류명": "튀김류"
+    },
+    {
+      "식품명": "계란 덮밥",
+      "에너지(kcal)": 152,
+      "나트륨(mg)": 106,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "겨자채",
+      "에너지(kcal)": 128,
+      "나트륨(mg)": 628,
+      "cluster": 1,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "검정콩밥_보리",
+      "에너지(kcal)": 143,
+      "나트륨(mg)": 1,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "검정콩밥",
+      "에너지(kcal)": 120,
+      "나트륨(mg)": 1,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "건새우볶음",
+      "에너지(kcal)": 154,
+      "나트륨(mg)": 1122,
+      "cluster": 1,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "건새우 미역국",
+      "에너지(kcal)": 28,
+      "나트륨(mg)": 353,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "강낭콩밥",
+      "에너지(kcal)": 111,
+      "나트륨(mg)": 2,
+      "cluster": 2,
+      "식품대분류명": "밥류"
+    },
+    {
+      "식품명": "감자튀김",
+      "에너지(kcal)": 114,
+      "나트륨(mg)": 432,
+      "cluster": 2,
+      "식품대분류명": "튀김류"
+    },
+    {
+      "식품명": "감자탕",
+      "에너지(kcal)": 65,
+      "나트륨(mg)": 216,
+      "cluster": 0,
+      "식품대분류명": "찌개 및 전골류"
+    },
+    {
+      "식품명": "감자조림",
+      "에너지(kcal)": 75,
+      "나트륨(mg)": 282,
+      "cluster": 0,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "감자전",
+      "에너지(kcal)": 41,
+      "나트륨(mg)": 1,
+      "cluster": 0,
+      "식품대분류명": "전·적 및 부침류"
+    },
+    {
+      "식품명": "감자스프",
+      "에너지(kcal)": 85,
+      "나트륨(mg)": 20,
+      "cluster": 0,
+      "식품대분류명": "죽 및 스프류"
+    },
+    {
+      "식품명": "감자샐러드",
+      "에너지(kcal)": 165,
+      "나트륨(mg)": 316,
+      "cluster": 2,
+      "식품대분류명": "생채·무침류"
+    },
+    {
+      "식품명": "감자볶음_햄_채소",
+      "에너지(kcal)": 47,
+      "나트륨(mg)": 162,
+      "cluster": 0,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "감자볶음_채소",
+      "에너지(kcal)": 67,
+      "나트륨(mg)": 357,
+      "cluster": 0,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "감자볶음_잔멸치",
+      "에너지(kcal)": 153,
+      "나트륨(mg)": 547,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "감자볶음_양파",
+      "에너지(kcal)": 114,
+      "나트륨(mg)": 354,
+      "cluster": 2,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "감자볶음_감자_햄",
+      "에너지(kcal)": 47,
+      "나트륨(mg)": 162,
+      "cluster": 0,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "감자볶음_감자_베이컨",
+      "에너지(kcal)": 53,
+      "나트륨(mg)": 139,
+      "cluster": 0,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "감자볶음",
+      "에너지(kcal)": 52,
+      "나트륨(mg)": 164,
+      "cluster": 0,
+      "식품대분류명": "볶음류"
+    },
+    {
+      "식품명": "감자범벅",
+      "에너지(kcal)": 93,
+      "나트륨(mg)": 597,
+      "cluster": 0,
+      "식품대분류명": "곡류, 서류 제품"
+    },
+    {
+      "식품명": "감자그라탕",
+      "에너지(kcal)": 138,
+      "나트륨(mg)": 390,
+      "cluster": 2,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "감자국",
+      "에너지(kcal)": 22,
+      "나트륨(mg)": 354,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "감자구이",
+      "에너지(kcal)": 81,
+      "나트륨(mg)": 227,
+      "cluster": 0,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "감자 소고기찌개",
+      "에너지(kcal)": 52,
+      "나트륨(mg)": 299,
+      "cluster": 0,
+      "식품대분류명": "찌개 및 전골류"
+    },
+    {
+      "식품명": "감자 된장국_두부",
+      "에너지(kcal)": 32,
+      "나트륨(mg)": 207,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "갈치찌개",
+      "에너지(kcal)": 39,
+      "나트륨(mg)": 311,
+      "cluster": 0,
+      "식품대분류명": "찌개 및 전골류"
+    },
+    {
+      "식품명": "갈치조림_무",
+      "에너지(kcal)": 118,
+      "나트륨(mg)": 298,
+      "cluster": 2,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "갈치구이_기름",
+      "에너지(kcal)": 118,
+      "나트륨(mg)": 184,
+      "cluster": 2,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "갈치구이",
+      "에너지(kcal)": 117,
+      "나트륨(mg)": 184,
+      "cluster": 2,
+      "식품대분류명": "구이류"
+    },
+    {
+      "식품명": "갈비탕",
+      "에너지(kcal)": 33,
+      "나트륨(mg)": 91,
+      "cluster": 0,
+      "식품대분류명": "국 및 탕류"
+    },
+    {
+      "식품명": "가지탕수",
+      "에너지(kcal)": 171,
+      "나트륨(mg)": 262,
+      "cluster": 2,
+      "식품대분류명": "튀김류"
+    },
+    {
+      "식품명": "가지전",
+      "에너지(kcal)": 37,
+      "나트륨(mg)": 182,
+      "cluster": 0,
+      "식품대분류명": "전·적 및 부침류"
+    },
+    {
+      "식품명": "가지나물",
+      "에너지(kcal)": 64,
+      "나트륨(mg)": 584,
+      "cluster": 0,
+      "식품대분류명": "나물·숙채류"
+    },
+    {
+      "식품명": "가자미튀김",
+      "에너지(kcal)": 225,
+      "나트륨(mg)": 758,
+      "cluster": 1,
+      "식품대분류명": "튀김류"
+    },
+    {
+      "식품명": "가자미조림",
+      "에너지(kcal)": 174,
+      "나트륨(mg)": 691,
+      "cluster": 1,
+      "식품대분류명": "조림류"
+    },
+    {
+      "식품명": "가자미구이",
+      "에너지(kcal)": 127,
+      "나트륨(mg)": 289,
+      "cluster": 2,
+      "식품대분류명": "구이류"
+    }
+  ],
+  "stats": [
+    {
+      "cluster": 0,
+      "count": 305,
+      "avg_energy": 43.69508196721311,
+      "avg_sodium": 249.58688524590164,
+      "categories": {
+        "국 및 탕류": 92,
+        "생채·무침류": 54,
+        "나물·숙채류": 39,
+        "찌개 및 전골류": 33,
+        "볶음류": 31
+      }
+    },
+    {
+      "cluster": 1,
+      "count": 75,
+      "avg_energy": 196.90666666666667,
+      "avg_sodium": 844.9733333333334,
+      "categories": {
+        "볶음류": 14,
+        "구이류": 13,
+        "조림류": 13,
+        "튀김류": 11,
+        "전·적 및 부침류": 7
+      }
+    },
+    {
+      "cluster": 2,
+      "count": 227,
+      "avg_energy": 141.76211453744494,
+      "avg_sodium": 227.62555066079295,
+      "categories": {
+        "밥류": 58,
+        "볶음류": 37,
+        "튀김류": 22,
+        "전·적 및 부침류": 19,
+        "구이류": 19
+      }
+    }
+  ],
+  "silhouette_score": 0.4180543016637896
+};
+        
+        // 색상 정의 - 그라데이션 색상으로 변경
+        const colors = {
+            0: '#667eea',
+            1: '#f5576c',
+            2: '#00d4ff'
+        };
+        
+        // 현재 필터링된 데이터
+        let filteredData = [...clusterData.data];
+        let selectedFood = null;
+        
+        // 산점도 생성 - 더 이쁘게
+        function createScatterPlot(dataToPlot = clusterData.data, highlightFood = null) {
+            const traces = [0, 1, 2].map(cluster => {
+                const clusterPoints = dataToPlot.filter(d => d.cluster === cluster);
+                
+                // 선택된 음식과 나머지 분리
+                const normalPoints = highlightFood 
+                    ? clusterPoints.filter(d => d.식품명 !== highlightFood)
+                    : clusterPoints;
+                
+                return {
+                    x: normalPoints.map(d => d['에너지(kcal)']),
+                    y: normalPoints.map(d => d['나트륨(mg)']),
+                    mode: 'markers',
+                    type: 'scatter',
+                    name: `Cluster ${cluster}`,
+                    text: normalPoints.map(d => `${d.식품명}<br>카테고리: ${d.식품대분류명}`),
+                    hovertemplate: '<b>%{text}</b><br>에너지: %{x:.1f} kcal<br>나트륨: %{y:.1f} mg<extra></extra>',
+                    marker: {
+                        color: colors[cluster],
+                        size: 10,
+                        opacity: highlightFood ? 0.25 : 0.75,
+                        line: {
+                            color: 'white',
+                            width: 2
+                        },
+                        symbol: 'circle'
+                    }
+                };
+            });
+            
+            // 선택된 음식이 있으면 강조 표시
+            if (highlightFood) {
+                const selectedItem = dataToPlot.find(d => d.식품명 === highlightFood);
+                if (selectedItem) {
+                    traces.push({
+                        x: [selectedItem['에너지(kcal)']],
+                        y: [selectedItem['나트륨(mg)']],
+                        mode: 'markers',
+                        type: 'scatter',
+                        name: '선택된 음식',
+                        text: [`${selectedItem.식품명}<br>카테고리: ${selectedItem.식품대분류명}`],
+                        hovertemplate: '<b>%{text}</b><br>에너지: %{x:.1f} kcal<br>나트륨: %{y:.1f} mg<extra></extra>',
+                        marker: {
+                            color: '#ff1744',
+                            size: 20,
+                            opacity: 1,
+                            line: {
+                                color: '#fff',
+                                width: 3
+                            },
+                            symbol: 'star'
+                        },
+                        showlegend: true
+                    });
+                }
+            }
+            
+            const layout = {
+                xaxis: {
+                    title: {
+                        text: '에너지 (kcal)',
+                        font: {
+                            size: 16,
+                            weight: 700,
+                            color: '#2d3748'
+                        }
+                    },
+                    gridcolor: '#e2e8f0',
+                    gridwidth: 1,
+                    showline: true,
+                    linecolor: '#cbd5e0',
+                    linewidth: 2,
+                    zeroline: false
+                },
+                yaxis: {
+                    title: {
+                        text: '나트륨 (mg)',
+                        font: {
+                            size: 16,
+                            weight: 700,
+                            color: '#2d3748'
+                        },
+                        standoff: 15
+                    },
+                    gridcolor: '#e2e8f0',
+                    gridwidth: 1,
+                    showline: true,
+                    linecolor: '#cbd5e0',
+                    linewidth: 2,
+                    zeroline: false
+                },
+                hovermode: 'closest',
+                plot_bgcolor: '#f7fafc',
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                font: { 
+                    family: 'Noto Sans KR, sans-serif',
+                    size: 13
+                },
+                legend: {
+                    x: 0.02,
+                    y: 0.98,
+                    xanchor: 'left',
+                    yanchor: 'top',
+                    bgcolor: 'rgba(255,255,255,0.95)',
+                    bordercolor: '#cbd5e0',
+                    borderwidth: 2,
+                    font: {
+                        size: 13,
+                        weight: 600
+                    }
+                },
+                margin: {
+                    l: 70,
+                    r: 30,
+                    t: 30,
+                    b: 60
+                }
+            };
+            
+            const config = {
+                responsive: true,
+                displayModeBar: true,
+                displaylogo: false,
+                modeBarButtonsToRemove: ['select2d', 'lasso2d']
+            };
+            
+            Plotly.newPlot('scatterPlot', traces, layout, config);
+        }
+        
+        // 클러스터 정보 카드 생성
+        function createClusterInfo() {
+            const container = document.getElementById('clusterInfo');
+            
+            clusterData.stats.forEach(stat => {
+                const card = document.createElement('div');
+                card.className = `cluster-card cluster-${stat.cluster}`;
+                
+                const categories = Object.entries(stat.categories)
+                    .slice(0, 5)
+                    .map(([name, count]) => `
+                        <div class="category-item">
+                            <span>${name}</span>
+                            <span class="badge">${count}개</span>
+                        </div>
+                    `).join('');
+                
+                const clusterLabels = {
+                    0: '저칼로리·중나트륨',
+                    1: '고칼로리·고나트륨',
+                    2: '중칼로리·저나트륨'
+                };
+                
+                card.innerHTML = `
+                    <div class="cluster-title" style="color: ${colors[stat.cluster]}">
+                        Cluster ${stat.cluster}: ${clusterLabels[stat.cluster]}
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">총 데이터 수</div>
+                        <div class="stat-value">${stat.count.toLocaleString()}개</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">평균 에너지</div>
+                        <div class="stat-value">${stat.avg_energy.toFixed(1)} kcal</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">평균 나트륨</div>
+                        <div class="stat-value">${stat.avg_sodium.toFixed(1)} mg</div>
+                    </div>
+                    <div class="category-list">
+                        <strong>주요 식품 카테고리:</strong>
+                        ${categories}
+                    </div>
+                `;
+                
+                container.appendChild(card);
+            });
+        }
+        
+        // 검색 결과 표시
+        function displaySearchResults(results) {
+            const container = document.getElementById('searchResults');
+            const countElement = document.getElementById('resultCount');
+            
+            countElement.textContent = `검색 결과: ${results.length}개`;
+            
+            if (results.length === 0) {
+                container.innerHTML = '<div class="no-results">검색 결과가 없습니다.</div>';
+                return;
+            }
+            
+            container.innerHTML = results.map(item => `
+                <div class="result-item ${selectedFood === item.식품명 ? 'selected' : ''}" onclick="selectFood('${item.식품명}')">
+                    <div class="result-name">
+                        ${item.식품명}
+                        <span class="cluster-badge cluster-badge-${item.cluster}">C${item.cluster}</span>
+                    </div>
+                    <div class="result-category">${item.식품대분류명}</div>
+                    <div class="result-stats">
+                        에너지: ${item['에너지(kcal)'].toFixed(1)} kcal | 
+                        나트륨: ${item['나트륨(mg)'].toFixed(1)} mg
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // 음식 선택 함수
+        function selectFood(foodName) {
+            if (selectedFood === foodName) {
+                // 같은 음식 다시 클릭하면 선택 해제
+                selectedFood = null;
+                createScatterPlot(filteredData);
+            } else {
+                // 새로운 음식 선택
+                selectedFood = foodName;
+                createScatterPlot(filteredData, foodName);
+            }
+            displaySearchResults(filteredData);
+        }
+        
+        // 검색 및 필터링 로직
+        function performSearch() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const selectedClusters = Array.from(document.querySelectorAll('.cluster-filter input:checked'))
+                .map(cb => parseInt(cb.value));
+            
+            filteredData = clusterData.data.filter(item => {
+                const matchesSearch = item.식품명.toLowerCase().includes(searchTerm) ||
+                                    item.식품대분류명.toLowerCase().includes(searchTerm);
+                const matchesCluster = selectedClusters.includes(item.cluster);
+                return matchesSearch && matchesCluster;
+            });
+            
+            // 선택된 음식이 필터링 결과에 없으면 선택 해제
+            if (selectedFood && !filteredData.find(d => d.식품명 === selectedFood)) {
+                selectedFood = null;
+            }
+            
+            displaySearchResults(filteredData);
+            createScatterPlot(filteredData, selectedFood);
+        }
+        
+        // 포인트 하이라이트 (클릭 시)
+        function highlightPoint(foodName) {
+            const item = clusterData.data.find(d => d.식품명 === foodName);
+            if (!item) return;
+            
+            // 해당 포인트 중심으로 줌
+            Plotly.relayout('scatterPlot', {
+                'xaxis.range': [item['에너지(kcal)'] - 50, item['에너지(kcal)'] + 50],
+                'yaxis.range': [item['나트륨(mg)'] - 200, item['나트륨(mg)'] + 200]
+            });
+        }
+        
+        // 이벤트 리스너
+        document.getElementById('searchInput').addEventListener('input', performSearch);
+        document.querySelectorAll('.cluster-filter input').forEach(checkbox => {
+            checkbox.addEventListener('change', performSearch);
+        });
+        
+        // 초기화
+        createScatterPlot();
+        createClusterInfo();
+        displaySearchResults(clusterData.data);
+        
+        // 반응형 처리
+        window.addEventListener('resize', () => {
+            Plotly.Plots.resize('scatterPlot');
+        });
+    </script>
+</body>
+</html>
