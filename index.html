@@ -510,6 +510,27 @@
             <div>
                 <div class="card">
                     <h2>📈 클러스터 산점도 (100ml당 기준)</h2>
+                    
+                    <!-- 선택된 식품 정보 -->
+                    <div id="selectedFoodInfo" style="display: none; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); padding: 16px; border-radius: 12px; margin-bottom: 16px; border: 2px solid #f59e0b;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="font-weight: 700; color: #2d3748; font-size: 1.1em; margin-bottom: 6px;">
+                                    <span id="selectedFoodName"></span>
+                                    <span id="selectedFoodCluster" class="cluster-badge"></span>
+                                </div>
+                                <div style="color: #4a5568; font-size: 0.9em;">
+                                    <span id="selectedFoodCategory"></span> | 
+                                    에너지: <strong id="selectedFoodEnergy"></strong> kcal/100ml | 
+                                    나트륨: <strong id="selectedFoodSodium"></strong> mg/100ml
+                                </div>
+                            </div>
+                            <button onclick="clearSelection()" style="background: #ef4444; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.9em; transition: all 0.2s;">
+                                ✕ 선택 해제
+                            </button>
+                        </div>
+                    </div>
+                    
                     <div id="scatterPlot"></div>
                 </div>
                 
@@ -726,8 +747,11 @@
         function selectFood(foodName) {
             if (selectedFood === foodName) {
                 selectedFood = null;
+                updateSelectedFoodInfo(null);
             } else {
                 selectedFood = foodName;
+                const foodData = allData.find(d => d.식품명 === foodName);
+                updateSelectedFoodInfo(foodData);
                 
                 // 산점도로 스크롤 (부드럽게)
                 const plotElement = document.getElementById('scatterPlot');
@@ -736,6 +760,38 @@
                 }
             }
             createScatterPlot(selectedFood);
+            displaySearchResults(allData.filter(d => {
+                const term = document.getElementById('searchInput').value.toLowerCase();
+                return d.식품명.toLowerCase().includes(term) || d.식품대분류명.toLowerCase().includes(term);
+            }));
+            createClusterFoodsList();
+        }
+        
+        // 선택된 식품 정보 업데이트
+        function updateSelectedFoodInfo(foodData) {
+            const infoDiv = document.getElementById('selectedFoodInfo');
+            
+            if (!foodData) {
+                infoDiv.style.display = 'none';
+                return;
+            }
+            
+            infoDiv.style.display = 'block';
+            document.getElementById('selectedFoodName').textContent = foodData.식품명;
+            document.getElementById('selectedFoodCategory').textContent = foodData.식품대분류명;
+            document.getElementById('selectedFoodEnergy').textContent = foodData['에너지(kcal)'].toFixed(1);
+            document.getElementById('selectedFoodSodium').textContent = foodData['나트륨(mg)'].toFixed(1);
+            
+            const clusterBadge = document.getElementById('selectedFoodCluster');
+            clusterBadge.className = `cluster-badge cluster-badge-${foodData.cluster}`;
+            clusterBadge.textContent = clusterLabels[foodData.cluster];
+        }
+        
+        // 선택 해제 (초기화)
+        function clearSelection() {
+            selectedFood = null;
+            updateSelectedFoodInfo(null);
+            createScatterPlot(null);
             displaySearchResults(allData.filter(d => {
                 const term = document.getElementById('searchInput').value.toLowerCase();
                 return d.식품명.toLowerCase().includes(term) || d.식품대분류명.toLowerCase().includes(term);
