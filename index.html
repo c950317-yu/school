@@ -754,6 +754,9 @@
             
             // 실루엣 스코어 업데이트
             updateSilhouetteScore(tabName);
+            
+            // 검색 결과 업데이트 (클러스터 라벨과 섭취 정보 변경)
+            performSearch();
         }
         
         // 실루엣 스코어 업데이트 함수
@@ -1134,7 +1137,10 @@
                         </div>
                         <div class="result-stats">
                             ${item.식품대분류명} | ${item.식품중량}ml<br>
-                            섭취: ${item.섭취에너지.toFixed(0)}kcal, ${item['섭취나트륨(mg)'].toFixed(0)}mg
+                            ${currentTab === 'energy-sodium' 
+                                ? `섭취: ${item.섭취에너지.toFixed(0)}kcal, ${item['섭취나트륨(mg)'].toFixed(0)}mg`
+                                : `섭취: 당류 ${item.섭취당류.toFixed(1)}g, 식이섬유 ${item.섭취식이섬유.toFixed(1)}g`
+                            }
                         </div>
                         <button class="add-btn" onclick='event.stopPropagation(); addToTray(${JSON.stringify(item).replace(/'/g, "\'")})'> ➕</button>
                     </div>
