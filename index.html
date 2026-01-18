@@ -697,9 +697,9 @@
         };
         
         const clusterLabelsEnergy = {
-            0: '중에너지/중나트륨',
-            1: '저에너지/저나트륨',
-            2: '저에너지/초고나트륨'
+            0: '저에너지/저나트륨',
+            1: '저에너지/초고나트륨',
+            2: '고에너지/중나트륨'
         };
         
         const clusterLabelsSugar = {
@@ -714,7 +714,8 @@
         let selectedFoodSugar = null;
         let currentTab = 'energy-sodium';
         
-        document.getElementById('silhouetteScore').textContent = clusterData.silhouette_score_energy_sodium.toFixed(4);
+        // 초기 실루엣 스코어 (에너지/나트륨)
+        updateSilhouetteScore('energy-sodium');
         
         // 탭 전환
         function switchTab(tabName) {
@@ -734,6 +735,17 @@
                 document.getElementById('tab-sugar-fiber').classList.add('active');
                 document.getElementById('stats-sugar-fiber').classList.add('active');
             }
+            
+            // 실루엣 스코어 업데이트
+            updateSilhouetteScore(tabName);
+        }
+        
+        // 실루엣 스코어 업데이트 함수
+        function updateSilhouetteScore(tabName) {
+            const score = tabName === 'energy-sodium' 
+                ? clusterData.silhouette_score_energy_sodium
+                : clusterData.silhouette_score_sugar_fiber;
+            document.getElementById('silhouetteScore').textContent = score.toFixed(4);
         }
         
         // 에너지/나트륨 산점도
