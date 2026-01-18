@@ -1039,6 +1039,7 @@
                 return d.식품명.toLowerCase().includes(term) || d.식품대분류명.toLowerCase().includes(term);
             }));
             createClusterFoodsListEnergy();
+            updateTray(); // 식판도 업데이트
         }
         
         // 당류/식이섬유 음식 선택
@@ -1058,6 +1059,7 @@
             }
             createScatterPlotSugar(selectedFoodSugar);
             createClusterFoodsListSugar();
+            updateTray(); // 식판도 업데이트
         }
         
         // 선택된 식품 정보 업데이트 (에너지/나트륨)
@@ -1110,6 +1112,7 @@
                 return d.식품명.toLowerCase().includes(term) || d.식품대분류명.toLowerCase().includes(term);
             }));
             createClusterFoodsListEnergy();
+            updateTray(); // 식판도 업데이트
         }
         
         function clearSelectionSugar() {
@@ -1117,6 +1120,7 @@
             updateSelectedFoodInfoSugar(null);
             createScatterPlotSugar(null);
             createClusterFoodsListSugar();
+            updateTray(); // 식판도 업데이트
         }
 
         // 검색
