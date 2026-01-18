@@ -540,6 +540,16 @@
         .tab-content.active {
             display: block;
         }
+        
+        #addToTrayBtn:hover, #addToTrayBtnSugar:hover {
+            background: #059669 !important;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
+        }
+        
+        #addToTrayBtn:active, #addToTrayBtnSugar:active {
+            transform: translateY(0);
+        }
     </style>
 </head>
 <body>
@@ -595,9 +605,14 @@
                                     나트륨: <strong id="selectedFoodSodium"></strong> mg/100ml
                                 </div>
                             </div>
-                            <button onclick="clearSelection()" style="background: #ef4444; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.9em; transition: all 0.2s;">
-                                ✕ 선택 해제
-                            </button>
+                            <div style="display: flex; gap: 8px;">
+                                <button id="addToTrayBtn" onclick="addSelectedToTray()" style="background: #10b981; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.9em; transition: all 0.2s;">
+                                    ➕ 식판에 담기
+                                </button>
+                                <button onclick="clearSelection()" style="background: #ef4444; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.9em; transition: all 0.2s;">
+                                    ✕ 선택 해제
+                                </button>
+                            </div>
                         </div>
                     </div>
                     
@@ -622,9 +637,14 @@
                                         식이섬유: <strong id="selectedFoodFiberValue"></strong> g/100ml
                                     </div>
                                 </div>
-                                <button onclick="clearSelectionSugar()" style="background: #ef4444; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.9em; transition: all 0.2s;">
-                                    ✕ 선택 해제
-                                </button>
+                                <div style="display: flex; gap: 8px;">
+                                    <button id="addToTrayBtnSugar" onclick="addSelectedToTraySugar()" style="background: #10b981; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.9em; transition: all 0.2s;">
+                                        ➕ 식판에 담기
+                                    </button>
+                                    <button onclick="clearSelectionSugar()" style="background: #ef4444; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.9em; transition: all 0.2s;">
+                                        ✕ 선택 해제
+                                    </button>
+                                </div>
                             </div>
                         </div>
                         
@@ -799,7 +819,8 @@
                     type: 'scatter',
                     name: clusterLabelsEnergy[cluster],
                     text: normalPoints.map(d => `${d.식품명}<br>${d.식품대분류명}`),
-                    hovertemplate: '<b>%{text}</b><br>에너지: %{x:.1f} kcal/100ml<br>나트륨: %{y:.1f} mg/100ml<extra></extra>',
+                    customdata: normalPoints.map(d => d.식품명), // 식품명 저장
+                    hovertemplate: '<b>%{text}</b><br>에너지: %{x:.1f} kcal/100ml<br>나트륨: %{y:.1f} mg/100ml<br><i>클릭하여 식판에 추가</i><extra></extra>',
                     marker: {
                         color: colors[cluster],
                         size: 8,
@@ -818,7 +839,8 @@
                         type: 'scatter',
                         name: '선택된 식품',
                         text: [`${selectedItem.식품명}<br>${selectedItem.식품대분류명}`],
-                        hovertemplate: '<b>%{text}</b><br>에너지: %{x:.1f} kcal/100ml<br>나트륨: %{y:.1f} mg/100ml<extra></extra>',
+                        customdata: [selectedItem.식품명],
+                        hovertemplate: '<b>%{text}</b><br>에너지: %{x:.1f} kcal/100ml<br>나트륨: %{y:.1f} mg/100ml<br><i>클릭하여 식판에 추가</i><extra></extra>',
                         marker: {
                             color: '#f59e0b',
                             size: 20,
@@ -830,12 +852,39 @@
                 }
             }
             
-            Plotly.newPlot('scatterPlotEnergySodium', traces, {
+            const layout = {
                 xaxis: { title: '에너지 (kcal/100ml)' },
                 yaxis: { title: '나트륨 (mg/100ml)' },
                 hovermode: 'closest',
                 margin: { l: 60, r: 30, t: 30, b: 50 }
-            }, { responsive: true, displaylogo: false });
+            };
+            
+            const config = { responsive: true, displaylogo: false };
+            
+            Plotly.newPlot('scatterPlotEnergySodium', traces, layout, config);
+            
+            // 클릭 이벤트 추가
+            document.getElementById('scatterPlotEnergySodium').on('plotly_click', function(data) {
+                const point = data.points[0];
+                const foodName = point.customdata;
+                const foodData = allData.find(d => d.식품명 === foodName);
+                
+                if (foodData) {
+                    // 식판에 추가
+                    if (!trayItems.find(t => t.식품명 === foodName)) {
+                        addToTray(foodData);
+                        // 피드백: 간단한 알림
+                        const notification = document.createElement('div');
+                        notification.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #10b981; color: white; padding: 12px 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 10000; font-weight: 700;';
+                        notification.textContent = `✓ ${foodName} 식판에 추가됨`;
+                        document.body.appendChild(notification);
+                        setTimeout(() => notification.remove(), 2000);
+                    } else {
+                        // 이미 있으면 선택만
+                        selectFood(foodName);
+                    }
+                }
+            });
         }
         
         // 당류/식이섬유 산점도
@@ -853,7 +902,8 @@
                     type: 'scatter',
                     name: clusterLabelsSugar[cluster],
                     text: normalPoints.map(d => `${d.식품명}<br>${d.식품대분류명}`),
-                    hovertemplate: '<b>%{text}</b><br>당류: %{x:.1f} g/100ml<br>식이섬유: %{y:.1f} g/100ml<extra></extra>',
+                    customdata: normalPoints.map(d => d.식품명), // 식품명 저장
+                    hovertemplate: '<b>%{text}</b><br>당류: %{x:.1f} g/100ml<br>식이섬유: %{y:.1f} g/100ml<br><i>클릭하여 식판에 추가</i><extra></extra>',
                     marker: {
                         color: colors[cluster],
                         size: 8,
@@ -872,7 +922,8 @@
                         type: 'scatter',
                         name: '선택된 식품',
                         text: [`${selectedItem.식품명}<br>${selectedItem.식품대분류명}`],
-                        hovertemplate: '<b>%{text}</b><br>당류: %{x:.1f} g/100ml<br>식이섬유: %{y:.1f} g/100ml<extra></extra>',
+                        customdata: [selectedItem.식품명],
+                        hovertemplate: '<b>%{text}</b><br>당류: %{x:.1f} g/100ml<br>식이섬유: %{y:.1f} g/100ml<br><i>클릭하여 식판에 추가</i><extra></extra>',
                         marker: {
                             color: '#f59e0b',
                             size: 20,
@@ -884,12 +935,39 @@
                 }
             }
             
-            Plotly.newPlot('scatterPlotSugarFiber', traces, {
+            const layout = {
                 xaxis: { title: '당류 (g/100ml)' },
                 yaxis: { title: '식이섬유 (g/100ml)' },
                 hovermode: 'closest',
                 margin: { l: 60, r: 30, t: 30, b: 50 }
-            }, { responsive: true, displaylogo: false });
+            };
+            
+            const config = { responsive: true, displaylogo: false };
+            
+            Plotly.newPlot('scatterPlotSugarFiber', traces, layout, config);
+            
+            // 클릭 이벤트 추가
+            document.getElementById('scatterPlotSugarFiber').on('plotly_click', function(data) {
+                const point = data.points[0];
+                const foodName = point.customdata;
+                const foodData = allData.find(d => d.식품명 === foodName);
+                
+                if (foodData) {
+                    // 식판에 추가
+                    if (!trayItems.find(t => t.식품명 === foodName)) {
+                        addToTray(foodData);
+                        // 피드백: 간단한 알림
+                        const notification = document.createElement('div');
+                        notification.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #10b981; color: white; padding: 12px 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 10000; font-weight: 700;';
+                        notification.textContent = `✓ ${foodName} 식판에 추가됨`;
+                        document.body.appendChild(notification);
+                        setTimeout(() => notification.remove(), 2000);
+                    } else {
+                        // 이미 있으면 선택만
+                        selectFoodSugar(foodName);
+                    }
+                }
+            });
         }
         
         // 에너지/나트륨 클러스터 통계
@@ -1100,6 +1178,62 @@
             const clusterBadge = document.getElementById('selectedFoodClusterSugar');
             clusterBadge.className = `cluster-badge cluster-badge-${foodData.cluster_sugar_fiber}`;
             clusterBadge.textContent = clusterLabelsSugar[foodData.cluster_sugar_fiber];
+        }
+        
+        // 선택된 식품을 식판에 추가 (에너지/나트륨)
+        function addSelectedToTray() {
+            if (!selectedFood) return;
+            
+            const foodData = allData.find(d => d.식품명 === selectedFood);
+            if (!foodData) return;
+            
+            // 이미 식판에 있는지 확인
+            if (trayItems.find(t => t.식품명 === selectedFood)) {
+                // 이미 있으면 알림
+                const notification = document.createElement('div');
+                notification.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #f59e0b; color: white; padding: 12px 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 10000; font-weight: 700;';
+                notification.textContent = `⚠️ ${selectedFood}은(는) 이미 식판에 있습니다`;
+                document.body.appendChild(notification);
+                setTimeout(() => notification.remove(), 2000);
+            } else {
+                // 식판에 추가
+                addToTray(foodData);
+                
+                // 성공 알림
+                const notification = document.createElement('div');
+                notification.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #10b981; color: white; padding: 12px 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 10000; font-weight: 700;';
+                notification.textContent = `✓ ${selectedFood} 식판에 추가됨`;
+                document.body.appendChild(notification);
+                setTimeout(() => notification.remove(), 2000);
+            }
+        }
+        
+        // 선택된 식품을 식판에 추가 (당류/식이섬유)
+        function addSelectedToTraySugar() {
+            if (!selectedFoodSugar) return;
+            
+            const foodData = allData.find(d => d.식품명 === selectedFoodSugar);
+            if (!foodData) return;
+            
+            // 이미 식판에 있는지 확인
+            if (trayItems.find(t => t.식품명 === selectedFoodSugar)) {
+                // 이미 있으면 알림
+                const notification = document.createElement('div');
+                notification.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #f59e0b; color: white; padding: 12px 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 10000; font-weight: 700;';
+                notification.textContent = `⚠️ ${selectedFoodSugar}은(는) 이미 식판에 있습니다`;
+                document.body.appendChild(notification);
+                setTimeout(() => notification.remove(), 2000);
+            } else {
+                // 식판에 추가
+                addToTray(foodData);
+                
+                // 성공 알림
+                const notification = document.createElement('div');
+                notification.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #10b981; color: white; padding: 12px 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 10000; font-weight: 700;';
+                notification.textContent = `✓ ${selectedFoodSugar} 식판에 추가됨`;
+                document.body.appendChild(notification);
+                setTimeout(() => notification.remove(), 2000);
+            }
         }
         
         // 선택 해제
