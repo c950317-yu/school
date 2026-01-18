@@ -296,6 +296,20 @@
             border-radius: 12px;
             padding: 12px;
             position: relative;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .tray-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            background: #f0fdf4;
+        }
+        
+        .tray-item.selected {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border: 2px solid #f59e0b;
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
         }
         
         .tray-item-name {
@@ -1189,9 +1203,13 @@
                         ? item.cluster_energy_sodium
                         : item.cluster_sugar_fiber;
                     
+                    // 현재 선택된 식품인지 확인
+                    const isSelected = (currentTab === 'energy-sodium' && selectedFood === item.식품명) 
+                        || (currentTab === 'sugar-fiber' && selectedFoodSugar === item.식품명);
+                    
                     return `
-                    <div class="tray-item">
-                        <button class="remove-btn" onclick="removeFromTray(${idx})">×</button>
+                    <div class="tray-item ${isSelected ? 'selected' : ''}" onclick="selectFoodFromTray('${item.식품명}')">
+                        <button class="remove-btn" onclick="event.stopPropagation(); removeFromTray(${idx})">×</button>
                         <div class="tray-item-name">
                             ${item.식품명}
                             <span class="cluster-badge cluster-badge-${clusterNum}">${clusterLabel}</span>
@@ -1209,6 +1227,15 @@
             }
             
             updateSummary();
+        }
+        
+        // 식판에서 식품 선택
+        function selectFoodFromTray(foodName) {
+            if (currentTab === 'energy-sodium') {
+                selectFood(foodName);
+            } else {
+                selectFoodSugar(foodName);
+            }
         }
         
         function updateSummary() {
