@@ -757,6 +757,9 @@
             
             // 검색 결과 업데이트 (클러스터 라벨과 섭취 정보 변경)
             performSearch();
+            
+            // 식판 업데이트 (클러스터 라벨과 섭취 정보 변경)
+            updateTray();
         }
         
         // 실루엣 스코어 업데이트 함수
@@ -1177,19 +1180,32 @@
             if (trayItems.length === 0) {
                 grid.innerHTML = '<div class="empty-tray">검색해서 식품을 추가하세요!</div>';
             } else {
-                grid.innerHTML = trayItems.map((item, idx) => `
+                grid.innerHTML = trayItems.map((item, idx) => {
+                    // 현재 탭에 따라 클러스터 정보 결정
+                    const clusterLabel = currentTab === 'energy-sodium' 
+                        ? clusterLabelsEnergy[item.cluster_energy_sodium]
+                        : clusterLabelsSugar[item.cluster_sugar_fiber];
+                    const clusterNum = currentTab === 'energy-sodium'
+                        ? item.cluster_energy_sodium
+                        : item.cluster_sugar_fiber;
+                    
+                    return `
                     <div class="tray-item">
                         <button class="remove-btn" onclick="removeFromTray(${idx})">×</button>
                         <div class="tray-item-name">
                             ${item.식품명}
-                            <span class="cluster-badge cluster-badge-${item.cluster_energy_sodium}">${clusterLabelsEnergy[item.cluster_energy_sodium]}</span>
+                            <span class="cluster-badge cluster-badge-${clusterNum}">${clusterLabel}</span>
                         </div>
                         <div class="tray-item-info">
                             ${item.식품대분류명} (${item.식품중량}ml)<br>
-                            ${item.섭취에너지.toFixed(0)}kcal | ${item['섭취나트륨(mg)'].toFixed(0)}mg
+                            ${currentTab === 'energy-sodium' 
+                                ? `${item.섭취에너지.toFixed(0)}kcal | ${item['섭취나트륨(mg)'].toFixed(0)}mg`
+                                : `당류 ${item.섭취당류.toFixed(1)}g | 식이섬유 ${item.섭취식이섬유.toFixed(1)}g`
+                            }
                         </div>
                     </div>
-                `).join('');
+                `;
+                }).join('');
             }
             
             updateSummary();
@@ -1283,14 +1299,25 @@
             // 클러스터 분석
             if (trayItems.length > 0) {
                 const clusterCounts = { 0: 0, 1: 0, 2: 0 };
-                trayItems.forEach(item => clusterCounts[item.cluster_energy_sodium]++);
+                // 현재 탭에 따라 클러스터 카운트
+                trayItems.forEach(item => {
+                    const cluster = currentTab === 'energy-sodium' 
+                        ? item.cluster_energy_sodium
+                        : item.cluster_sugar_fiber;
+                    clusterCounts[cluster]++;
+                });
+                
+                // 현재 탭에 맞는 클러스터 라벨 사용
+                const clusterLabels = currentTab === 'energy-sodium' 
+                    ? clusterLabelsEnergy
+                    : clusterLabelsSugar;
                 
                 document.getElementById('clusterBreakdown').style.display = 'block';
                 document.getElementById('clusterBreakdownContent').innerHTML = [0, 1, 2]
                     .filter(c => clusterCounts[c] > 0)
                     .map(c => `
                         <div class="cluster-breakdown-item">
-                            <span class="cluster-badge cluster-badge-${c}" style="margin-right: 10px;">${clusterLabelsEnergy[c]}</span>
+                            <span class="cluster-badge cluster-badge-${c}" style="margin-right: 10px;">${clusterLabels[c]}</span>
                             <span>${clusterCounts[c]}개</span>
                         </div>
                     `).join('');
